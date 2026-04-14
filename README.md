@@ -11,31 +11,31 @@ Claude Code project for zero-base research, analysis, and proposals.
 - [Claude Code](https://docs.anthropic.com/en/docs/claude-code)
 - [GitHub CLI](https://cli.github.com/) (`gh auth login`)
 - Node.js (for MCP servers)
-- Python / [uv](https://docs.astral.sh/uv/) (for MCP servers)
+- Python / [uv](https://docs.astral.sh/uv/) (for google-news-trends MCP)
 
 ### MCP Servers
-
-This project requires **3 Deep Search MCPs** (user-level) and **4 supplementary MCPs** (project-level).
-
-#### Deep Search MCPs (user-level setup required)
-
-These power the core research pipeline. Install via `claude mcp add` or your preferred method:
-
-| MCP | Command | API Key | Cost |
-|-----|---------|---------|------|
-| `gemini-deepsearch` | `gemini-deepsearch-mcp` | `GEMINI_API_KEY` ([Google AI Studio](https://aistudio.google.com/apikey)) | Free (250/day) |
-| `perplexity-web` | `npx -y perplexity-web-api-mcp` | `PERPLEXITY_API_KEY` ([Perplexity Settings](https://www.perplexity.ai/settings/api)) | ~$0.4-1.3/query |
-| `chatgpt` | [chatgpt-automation-mcp](https://github.com/brokencircle/chatgpt-automation-mcp) | ChatGPT Plus account | Free (250/month deep research) |
-
-The pipeline runs: **Gemini** (primary, free) → **Perplexity** (cross-validation, max ~3/topic) → **ChatGPT** (optional, deep research for critical topics).
-
-#### Supplementary MCPs (project `.mcp.json`)
 
 Create `.mcp.json` in the project root:
 
 ```json
 {
   "mcpServers": {
+    "gemini-deepsearch": {
+      "type": "stdio",
+      "command": "npx",
+      "args": ["-y", "gemini-deepsearch-mcp@latest"],
+      "env": {
+        "GEMINI_API_KEY": "<your-gemini-api-key>"
+      }
+    },
+    "perplexity-web": {
+      "type": "stdio",
+      "command": "npx",
+      "args": ["-y", "perplexity-mcp@latest"],
+      "env": {
+        "PERPLEXITY_API_KEY": "<your-perplexity-api-key>"
+      }
+    },
     "social-superpowers": {
       "type": "http",
       "url": "https://superpowers.social/mcp"
@@ -59,17 +59,14 @@ Create `.mcp.json` in the project root:
 }
 ```
 
-No API keys required for supplementary MCPs.
+### API Keys
 
-### Verify Setup
+| Key | Where to get | Cost |
+|-----|-------------|------|
+| `GEMINI_API_KEY` | [Google AI Studio](https://aistudio.google.com/apikey) | Free (250 deep research/day) |
+| `PERPLEXITY_API_KEY` | [Perplexity Settings](https://www.perplexity.ai/settings/api) | ~$0.4-1.3/query (sonar-deep-research) |
 
-```bash
-claude mcp list
-```
-
-All 7 MCPs should show `Connected`:
-- `gemini-deepsearch`, `perplexity-web`, `chatgpt` (user-level)
-- `social-superpowers`, `google-news-trends`, `playwright`, `github` (project-level)
+Gemini is used as the primary search engine. Perplexity is optional, used only for cross-validation of critical findings (~3 queries per topic).
 
 ## Usage
 
@@ -79,7 +76,7 @@ All 7 MCPs should show `Connected`:
 
 Runs a 5-phase pipeline:
 
-1. **Scoping** - MECE decomposition + Deep Search (Gemini/Perplexity/ChatGPT, auto-executed)
+1. **Scoping** - MECE decomposition + Deep Search (Gemini/Perplexity, auto-executed)
 2. **Research** - Cross-validation + supplementary research (SNS, local sources)
 3. **Deep Dive** - Case analysis + social sentiment
 4. **Synthesis** - Pattern extraction + insight distillation
