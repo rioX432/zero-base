@@ -80,9 +80,10 @@ MCP経由で**自動実行**する。ユーザーの手動操作は不要。
 | MCP | モデル | コスト | 用途 |
 |-----|--------|--------|------|
 | `mcp__gemini-deepsearch__deep_search` | Gemini Deep Research | 無料（250回/日） | メイン調査 |
-| `mcp__perplexity__perplexity_research` | sonar-deep-research | ~$0.4-1.3/回 | 重要軸の補完・クロスバリデーション |
+| `mcp__chatgpt__chatgpt_send_and_get_response` | ChatGPT (Web検索付き) | サブスク内（250回/月） | 並列調査・リアルタイム補完 |
+| `mcp__perplexity-web__perplexity_ask` | sonar-deep-research | ~$0.4-1.3/回 | 重要軸の補完・クロスバリデーション |
 
-コスト管理: まずGeminiで全軸実行 → Perplexityは最重要軸のみ（1テーマ最大3回目安）
+コスト管理: Gemini + ChatGPT で全軸並列実行 → Perplexityは最重要軸のみ（1テーマ最大3回目安）
 
 ## Sub-Agents
 

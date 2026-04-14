@@ -1,0 +1,55 @@
+{
+  "mcpServers": {
+    "gemini-deepsearch": {
+      "type": "stdio",
+      "command": "/Users/rio/.local/share/gemini-deepsearch-fixed/bin/gemini-deepsearch-mcp",
+      "args": [],
+      "env": {
+        "GEMINI_API_KEY": "${GEMINI_API_KEY}"
+      }
+    },
+    "perplexity-web": {
+      "type": "stdio",
+      "command": "npx",
+      "args": ["-y", "perplexity-web-api-mcp"]
+    },
+    "chatgpt": {
+      "type": "stdio",
+      "command": "bash",
+      "args": ["-c", "cd /Users/rio/.local/share/chatgpt-automation-mcp && uv run chatgpt-mcp"]
+    },
+    "social-superpowers": {
+      "type": "http",
+      "url": "https://superpowers.social/mcp"
+    },
+    "google-news-trends": {
+      "type": "stdio",
+      "command": "uvx",
+      "args": [
+        "google-news-trends-mcp@latest"
+      ],
+      "env": {}
+    },
+    "notion": {
+      "type": "http",
+      "url": "https://mcp.notion.com/mcp"
+    },
+    "playwright": {
+      "type": "stdio",
+      "command": "npx",
+      "args": [
+        "@playwright/mcp@latest"
+      ],
+      "env": {}
+    },
+    "github": {
+      "type": "stdio",
+      "command": "/bin/sh",
+      "args": [
+        "-c",
+        "GITHUB_PERSONAL_ACCESS_TOKEN=$(gh auth token) npx -y @modelcontextprotocol/server-github"
+      ],
+      "env": {}
+    }
+  }
+}

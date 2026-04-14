@@ -7,9 +7,6 @@ knowledge/
 # macOS
 .DS_Store
 
-# MCP config (may contain credentials)
-.mcp.json
-
 # Playwright MCP
 .playwright-mcp/
 

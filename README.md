@@ -15,27 +15,27 @@ Claude Code project for zero-base research, analysis, and proposals.
 
 ### MCP Servers
 
+This project requires **3 Deep Search MCPs** (user-level) and **4 supplementary MCPs** (project-level).
+
+#### Deep Search MCPs (user-level)
+
+These power the core research pipeline. Install via `claude mcp add` or your preferred method:
+
+| MCP | Tool | Cost |
+|-----|------|------|
+| `gemini-deepsearch` | `mcp__gemini-deepsearch__deep_search` | Free (250/day) |
+| `chatgpt` | `mcp__chatgpt__chatgpt_send_and_get_response` | ChatGPT Plus subscription (250/month deep research) |
+| `perplexity-web` | `mcp__perplexity-web__perplexity_ask` | ~$0.4-1.3/query |
+
+Pipeline: **Gemini + ChatGPT** run in parallel on all axes → **Perplexity** for cross-validation on critical axes only (~3/topic).
+
+#### Supplementary MCPs (project `.mcp.json`)
+
 Create `.mcp.json` in the project root:
 
 ```json
 {
   "mcpServers": {
-    "gemini-deepsearch": {
-      "type": "stdio",
-      "command": "npx",
-      "args": ["-y", "gemini-deepsearch-mcp@latest"],
-      "env": {
-        "GEMINI_API_KEY": "<your-gemini-api-key>"
-      }
-    },
-    "perplexity-web": {
-      "type": "stdio",
-      "command": "npx",
-      "args": ["-y", "perplexity-mcp@latest"],
-      "env": {
-        "PERPLEXITY_API_KEY": "<your-perplexity-api-key>"
-      }
-    },
     "social-superpowers": {
       "type": "http",
       "url": "https://superpowers.social/mcp"
@@ -59,14 +59,12 @@ Create `.mcp.json` in the project root:
 }
 ```
 
-### API Keys
+### Verify Setup
 
-| Key | Where to get | Cost |
-|-----|-------------|------|
-| `GEMINI_API_KEY` | [Google AI Studio](https://aistudio.google.com/apikey) | Free (250 deep research/day) |
-| `PERPLEXITY_API_KEY` | [Perplexity Settings](https://www.perplexity.ai/settings/api) | ~$0.4-1.3/query (sonar-deep-research) |
-
-Gemini is used as the primary search engine. Perplexity is optional, used only for cross-validation of critical findings (~3 queries per topic).
+```bash
+claude mcp list
+# All 7 MCPs should show "Connected"
+```
 
 ## Usage
 
@@ -76,7 +74,7 @@ Gemini is used as the primary search engine. Perplexity is optional, used only f
 
 Runs a 5-phase pipeline:
 
-1. **Scoping** - MECE decomposition + Deep Search (Gemini/Perplexity, auto-executed)
+1. **Scoping** - MECE decomposition + Deep Search (Gemini/ChatGPT/Perplexity, auto-executed)
 2. **Research** - Cross-validation + supplementary research (SNS, local sources)
 3. **Deep Dive** - Case analysis + social sentiment
 4. **Synthesis** - Pattern extraction + insight distillation

@@ -3,7 +3,7 @@ name: think
 description: テーマを受け取り、ゼロベース思考で網羅的調査→本質抽出→論理的提案を実行する。事実ベース・ソース付き・反論検証済みの提案を生成する。
 argument-hint: [テーマ・依頼内容（リポジトリURLを含む場合はリポジトリ分析モードで実行）]
 disable-model-invocation: true
-allowed-tools: Read, Write, Glob, Grep, Agent, WebSearch, WebFetch, AskUserQuestion, mcp__claude_ai_Notion__notion-fetch, mcp__claude_ai_Notion__notion-search, mcp__gemini-deepsearch__deep_search, mcp__perplexity__perplexity_research, mcp__perplexity__perplexity_search
+allowed-tools: Read, Write, Glob, Grep, Agent, WebSearch, WebFetch, AskUserQuestion, mcp__claude_ai_Notion__notion-fetch, mcp__claude_ai_Notion__notion-search, mcp__gemini-deepsearch__deep_search, mcp__perplexity-web__perplexity_search, mcp__perplexity-web__perplexity_ask, mcp__chatgpt__chatgpt_send_and_get_response
 effort: max
 ---
 
@@ -84,29 +84,36 @@ repo-analyzer の結果から**機能マップ**を作成（テンプレート�
 
 ### 1.2 Deep Search実行（MCP経由・自動）
 
-調査軸に基づき、**2つのDeep Search MCPを並列実行**してクロスバリデーションする。
+調査軸に基づき、**3つのDeep Search MCPを並列実行**してクロスバリデーションする。
 
 #### 実行方法
 
-**Gemini DeepSearch**（無料・メイン）と **Perplexity Research**（有料・補完）を並列で呼び出す:
+**Gemini DeepSearch**・**Perplexity Web**・**ChatGPT** を並列で呼び出す:
 
 ```
-# 並列実行（両方同時に呼ぶ）
+# 並列実行（3つ同時に呼ぶ）
 mcp__gemini-deepsearch__deep_search(query="{調査クエリ}", effort="high")
-mcp__perplexity__perplexity_research(query="{調査クエリ}")
+mcp__perplexity-web__perplexity_ask(query="{調査クエリ}")
+mcp__chatgpt__chatgpt_send_and_get_response(message="Search the web: {調査クエリ}. Include source URLs.")
 ```
+
+各MCPの特性:
+- **Gemini**: 最も詳細な結果を返す。JSONファイルに保存されるのでReadで読む
+- **Perplexity**: ソースURL付きで構造化された回答を返す
+- **ChatGPT**: Web検索付きで回答。リアルタイム情報やGemini/Perplexityが拾わない情報の補完に有用
 
 #### クエリ設計ルール
 - 調査軸ごとに1クエリ（軸が多い場合は重要度順に2〜3クエリに統合）
 - **ソースURL付きで回答するよう指示を含める**
 - 日本の事例が重要な場合は日本語クエリと英語クエリの両方を実行
 - Gemini は effort="high" で実行（無料枠内、1日250回まで）
-- Perplexity は重要な軸のみに使用（有料、$0.4〜1.3/回）
+- Perplexity は重要な軸のみに使用（有料、~$0.4-1.3/回）
+- ChatGPT は全軸で実行可能（サブスクリプションプラン、250回/月）
 
 #### コスト管理
-- **まずGeminiのみで実行**し、結果が不十分な軸だけPerplexityで補完する
-- 1テーマあたりのPerplexity使用は最大3回を目安とする
-- 軸が5つ以上ある場合はGeminiのみで全軸を網羅し、Perplexityは最重要軸に絞る
+- **Gemini + ChatGPT で全軸を並列実行**（両方無料枠/サブスク内）
+- Perplexity は最重要軸のみに使用（1テーマ最大3回目安）
+- 軸が5つ以上ある場合: Gemini + ChatGPT で全軸網羅、Perplexity は最重要軸に絞る
 
 ---
 
@@ -114,15 +121,18 @@ mcp__perplexity__perplexity_research(query="{調査クエリ}")
 
 ### 2.1 Deep Search結果の読み込み
 
-Phase 1.2 で実行したMCP Deep Search（Gemini / Perplexity）の結果を読み込む。
-Gemini は JSON ファイルパスを返すので Read で読む。Perplexity は直接テキストを返す。
+Phase 1.2 で実行した3つのMCP Deep Search（Gemini / Perplexity / ChatGPT）の結果を読み込む。
+- Gemini は JSON ファイルパスを返すので Read で読む
+- Perplexity は直接テキストを返す
+- ChatGPT は直接テキストを返す
 
 ### 2.2 クロスバリデーション
 
-両方の結果がある場合:
-- **一致する情報** → 信頼度「高」
-- **片方のみに存在** → 信頼度「中」、補完調査で確認
-- **矛盾する情報** → 両方記載し、WebSearchで追加確認
+3ソースの結果を突き合わせる:
+- **3ソース一致** → 信頼度「高」
+- **2ソース一致** → 信頼度「高」
+- **1ソースのみ** → 信頼度「中」、補完調査で確認
+- **矛盾する情報** → 全ソースを記載し、WebSearchで追加確認
 
 ### 2.3 補完調査
 
@@ -199,11 +209,12 @@ Phase 2 から提案に直結する重要事例を3〜7件選定:
 深掘り中に情報が大幅に不足する場合、追加のDeep SearchをMCP経由で自動実行する。
 
 ```
-# 不足している軸についてGeminiで追加調査
+# 不足している軸についてGemini + ChatGPTで追加調査
 mcp__gemini-deepsearch__deep_search(query="{不足情報に特化したクエリ}", effort="high")
+mcp__chatgpt__chatgpt_send_and_get_response(message="Search the web: {不足情報に特化したクエリ}. Include source URLs.")
 
 # 重要な不足の場合のみPerplexityも追加
-mcp__perplexity__perplexity_research(query="{不足情報に特化したクエリ}")
+mcp__perplexity-web__perplexity_ask(query="{不足情報に特化したクエリ}")
 ```
 
 結果を統合して分析を続行。
