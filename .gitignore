@@ -1,0 +1,17 @@
+# Research output (private per-project)
+workspace/
+
+# Knowledge base
+knowledge/
+
+# macOS
+.DS_Store
+
+# MCP config (may contain credentials)
+.mcp.json
+
+# Playwright MCP
+.playwright-mcp/
+
+# Claude Code memory (private per-user)
+.claude/projects/
