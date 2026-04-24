@@ -2,7 +2,7 @@
   "mcpServers": {
     "gemini-deepsearch": {
       "type": "stdio",
-      "command": "/Users/rio/.local/share/gemini-deepsearch-fixed/bin/gemini-deepsearch-mcp",
+      "command": "<PATH_TO>/gemini-deepsearch-mcp",
       "args": [],
       "env": {
         "GEMINI_API_KEY": "${GEMINI_API_KEY}"
@@ -16,7 +16,7 @@
     "chatgpt": {
       "type": "stdio",
       "command": "bash",
-      "args": ["-c", "cd /Users/rio/.local/share/chatgpt-automation-mcp && uv run chatgpt-mcp"]
+      "args": ["-c", "cd <PATH_TO>/chatgpt-automation-mcp && uv run chatgpt-mcp"]
     },
     "social-superpowers": {
       "type": "http",
