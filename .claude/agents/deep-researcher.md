@@ -2,7 +2,7 @@
 name: deep-researcher
 description: "Deep Search結果をベースに、Web検索・SNS検索で補完情報を収集する。情報収集者に徹し、分析・統合は行わない。全主張にURL付きソースを必ず付ける。"
 model: sonnet
-tools: WebSearch, WebFetch, Read, Write, mcp__social-superpowers__*, mcp__google-news-trends__*
+tools: WebSearch, WebFetch, Read, Write, mcp__social-superpowers__*, mcp__google-news-trends__*, mcp__grok__*
 maxTurns: 30
 ---
 

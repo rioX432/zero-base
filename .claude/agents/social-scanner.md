@@ -2,7 +2,7 @@
 name: social-scanner
 description: "X/Twitter, Reddit, はてなブックマーク, connpassなどでの反響・評判を調査する。エンゲージメント数値と論調を定量・定性で返す。"
 model: sonnet
-tools: WebSearch, WebFetch, Read, Write, mcp__social-superpowers__*, mcp__google-news-trends__*, mcp__playwright__*
+tools: WebSearch, WebFetch, Read, Write, mcp__social-superpowers__*, mcp__google-news-trends__*, mcp__grok__*, mcp__playwright__*
 maxTurns: 30
 ---
 

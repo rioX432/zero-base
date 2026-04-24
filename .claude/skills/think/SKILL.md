@@ -3,7 +3,7 @@ name: think
 description: テーマを受け取り、ゼロベース思考で網羅的調査→本質抽出→論理的提案を実行する。事実ベース・ソース付き・反論検証済みの提案を生成する。
 argument-hint: [テーマ・依頼内容（リポジトリURLを含む場合はリポジトリ分析モードで実行）]
 disable-model-invocation: true
-allowed-tools: Read, Write, Glob, Grep, Agent, WebSearch, WebFetch, AskUserQuestion, mcp__claude_ai_Notion__notion-fetch, mcp__claude_ai_Notion__notion-search, mcp__gemini-deepsearch__deep_search, mcp__perplexity-web__perplexity_search, mcp__perplexity-web__perplexity_ask, mcp__chatgpt__chatgpt_send_and_get_response
+allowed-tools: Read, Write, Glob, Grep, Agent, WebSearch, WebFetch, AskUserQuestion, mcp__claude_ai_Notion__notion-fetch, mcp__claude_ai_Notion__notion-search, mcp__gemini-deepsearch__deep_search, mcp__perplexity-web__perplexity_search, mcp__perplexity-web__perplexity_ask, mcp__chatgpt__chatgpt_send_and_get_response, mcp__social-superpowers__*, mcp__google-news-trends__*, mcp__grok__*
 effort: max
 ---
 
@@ -82,38 +82,53 @@ repo-analyzer の結果から**機能マップ**を作成（テンプレート�
 - 技術トレンドとの整合性（この領域で今後求められる機能）
 - 成功しているOSSの成長戦略（コミュニティ運営、リリース戦略）
 
-### 1.2 Deep Search実行（MCP経由・自動）
+### 1.2 並列情報収集（MCP経由・自動）
 
-調査軸に基づき、**3つのDeep Search MCPを並列実行**してクロスバリデーションする。
+調査軸に基づき、**Deep Search + SNSリアルタイム検索を同時並列実行**する。
 
 #### 実行方法
 
-**Gemini DeepSearch**・**Perplexity Web**・**ChatGPT** を並列で呼び出す:
+**全てを同時に並列実行する**（Layer間に依存関係なし）:
 
+**Layer 1: Deep Search（網羅的な背景調査）**
 ```
-# 並列実行（3つ同時に呼ぶ）
 mcp__gemini-deepsearch__deep_search(query="{調査クエリ}", effort="high")
-mcp__perplexity-web__perplexity_ask(query="{調査クエリ}")
 mcp__chatgpt__chatgpt_send_and_get_response(message="Search the web: {調査クエリ}. Include source URLs.")
+mcp__perplexity-web__perplexity_ask(query="{調査クエリ}")  # 最重要軸のみ
+```
+
+**Layer 2: SNSリアルタイム（最新の声・トレンド）**
+```
+mcp__social-superpowers__twitter-search(query="{テーマ関連キーワード}")
+mcp__social-superpowers__reddit-search(query="{テーマ関連キーワード}")
+mcp__google-news-trends__get_news_by_keyword(keyword="{テーマ}")
+mcp__google-news-trends__get_trending_terms(geo="JP")
+```
+
+**Layer 3: Grok X Search（X特化の深い検索）** ※XAI_API_KEY設定時のみ
+```
+mcp__grok__search_posts(query="{テーマ関連キーワード}")
+mcp__grok__get_trends()
 ```
 
 各MCPの特性:
 - **Gemini**: 最も詳細な結果を返す。JSONファイルに保存されるのでReadで読む
 - **Perplexity**: ソースURL付きで構造化された回答を返す
-- **ChatGPT**: Web検索付きで回答。リアルタイム情報やGemini/Perplexityが拾わない情報の補完に有用
+- **ChatGPT**: Web検索付きで回答
+- **social-superpowers**: X/Twitter + Redditのリアルタイム検索。無料・APIキー不要
+- **google-news-trends**: 最新ニュース + トレンドワード
+- **Grok**: xAI API経由のX/Twitter深層検索。日付範囲フィルタ、ハンドル指定が可能
 
 #### クエリ設計ルール
 - 調査軸ごとに1クエリ（軸が多い場合は重要度順に2〜3クエリに統合）
-- **ソースURL付きで回答するよう指示を含める**
+- **Deep Search向け**: ソースURL付きで回答するよう指示を含める
+- **SNS検索向け**: 短いキーワード（ハッシュタグ、製品名、技術名など）
 - 日本の事例が重要な場合は日本語クエリと英語クエリの両方を実行
-- Gemini は effort="high" で実行（無料枠内、1日250回まで）
-- Perplexity は重要な軸のみに使用（有料、~$0.4-1.3/回）
-- ChatGPT は全軸で実行可能（サブスクリプションプラン、250回/月）
 
 #### コスト管理
-- **Gemini + ChatGPT で全軸を並列実行**（両方無料枠/サブスク内）
-- Perplexity は最重要軸のみに使用（1テーマ最大3回目安）
-- 軸が5つ以上ある場合: Gemini + ChatGPT で全軸網羅、Perplexity は最重要軸に絞る
+- **Gemini + ChatGPT + social-superpowers + google-news-trends で全軸を並列実行**（全て無料枠/サブスク内）
+- Perplexity は最重要軸のみに使用（有料、~$0.4-1.3/回、1テーマ最大3回目安）
+- Grok X Search は $5/1,000回（APIキー設定時のみ、重要なX情報がある軸に使用）
 
 ---
 
@@ -128,18 +143,19 @@ Phase 1.2 で実行した3つのMCP Deep Search（Gemini / Perplexity / ChatGPT�
 
 ### 2.2 クロスバリデーション
 
-3ソースの結果を突き合わせる:
-- **3ソース一致** → 信頼度「高」
-- **2ソース一致** → 信頼度「高」
-- **1ソースのみ** → 信頼度「中」、補完調査で確認
+Deep Search結果（Gemini/ChatGPT/Perplexity）とSNSリアルタイム結果（social-superpowers/google-news-trends/Grok）を突き合わせる:
+- **複数ソース一致** → 信頼度「高」
+- **Deep SearchとSNSで一致** → 信頼度「高」（情報の鮮度も確認済み）
+- **Deep Searchのみ** → 信頼度「中」（最新状況をSNSで再確認）
+- **SNSのみ** → 信頼度「中」（速報性あるが裏取り必要）
 - **矛盾する情報** → 全ソースを記載し、WebSearchで追加確認
 
 ### 2.3 補完調査
 
-Deep Search結果で不足する情報を `deep-researcher` agent で補完:
-- Deep Searchが拾わなかった情報源（X/Twitter, Reddit, connpass等）
-- 日本ローカルの情報（Deep Searchが弱い領域）
-- 最新の情報（Deep Searchの収集タイミングより後の情報）
+Phase 1の結果で不足する情報を `deep-researcher` agent で補完:
+- Phase 1のSNS検索で拾えなかったニッチな情報源（connpass, 個人ブログ, Zenn等）
+- 日本ローカルの情報（Deep SearchもSNSも弱い領域）
+- 特定ユーザー・特定スレッドの深掘り
 
 ### 2.4 ソース検証
 
@@ -204,14 +220,18 @@ Phase 2 から提案に直結する重要事例を3〜7件選定:
 - 理由の分類: API制約（時間範囲外）、サイト制約（403）、ハンドル未特定、検索ヒットなし
 - **全ての「0件」はクロスチェック済みか明記する**
 
-### 3.4 追加 Deep Search（必要な場合）
+### 3.4 追加情報収集（必要な場合）
 
-深掘り中に情報が大幅に不足する場合、追加のDeep SearchをMCP経由で自動実行する。
+深掘り中に情報が大幅に不足する場合、追加のDeep Search・SNS検索をMCP経由で自動実行する。
 
 ```
-# 不足している軸についてGemini + ChatGPTで追加調査
+# Deep Search追加
 mcp__gemini-deepsearch__deep_search(query="{不足情報に特化したクエリ}", effort="high")
 mcp__chatgpt__chatgpt_send_and_get_response(message="Search the web: {不足情報に特化したクエリ}. Include source URLs.")
+
+# SNSリアルタイム追加
+mcp__social-superpowers__twitter-search(query="{不足情報のキーワード}")
+mcp__grok__search_posts(query="{不足情報のキーワード}")
 
 # 重要な不足の場合のみPerplexityも追加
 mcp__perplexity-web__perplexity_ask(query="{不足情報に特化したクエリ}")

@@ -24,13 +24,15 @@
 ```
 /think テーマ
   │
-  Phase 1: Scoping + Deep Search自動実行
+  Phase 1: Scoping + 並列情報収集
   │  ├─ 調査設計
-  │  └─ Gemini DeepSearch MCP + Perplexity MCP で並列実行
+  │  ├─ Deep Search（Gemini + ChatGPT + Perplexity）
+  │  ├─ SNSリアルタイム（social-superpowers + google-news-trends）
+  │  └─ Grok X Search（APIキー設定時）
   │
   Phase 2: Research（結果統合 + 補完調査）
-  │  ├─ Gemini/Perplexity結果のクロスバリデーション
-  │  ├─ deep-researcher で補完（SNS, 日本ローカル, 最新情報）
+  │  ├─ Deep Search + SNS結果のクロスバリデーション
+  │  ├─ deep-researcher で補完（Phase 1で不足した情報）
   │  └─ source-verifier で全URL検証
   │
   Phase 3: Deep Dive（深掘り分析）
@@ -54,9 +56,9 @@
   │  ├─ 機能マップ作成
   │  └─ ★ ユーザーに機能マップを確認
   │
-  Phase 1: Scoping + Deep Search自動実行（競合・先行事例調査）
+  Phase 1: Scoping + 並列情報収集（競合・先行事例調査）
   │  ├─ 自リポジトリの領域に合わせた調査設計
-  │  └─ Gemini/Perplexity MCP で自動実行
+  │  └─ Deep Search + SNSリアルタイム + Grok で並列実行
   │
   Phase 2-3: Research + Deep Dive（競合分析）
   │
@@ -73,17 +75,25 @@
 
 ★ = ユーザーとの対話ポイント
 
-## Deep Search の使い方
+## 情報収集ソース
 
-MCP経由で**自動実行**する。ユーザーの手動操作は不要。
+MCP経由で**自動実行**する。Phase 1 で全て同時並列実行。
 
-| MCP | モデル | コスト | 用途 |
-|-----|--------|--------|------|
-| `mcp__gemini-deepsearch__deep_search` | Gemini Deep Research | 無料（250回/日） | メイン調査 |
-| `mcp__chatgpt__chatgpt_send_and_get_response` | ChatGPT (Web検索付き) | サブスク内（250回/月） | 並列調査・リアルタイム補完 |
-| `mcp__perplexity-web__perplexity_ask` | sonar-deep-research | ~$0.4-1.3/回 | 重要軸の補完・クロスバリデーション |
+### Deep Search（背景調査）
+| MCP | コスト | 用途 |
+|-----|--------|------|
+| `mcp__gemini-deepsearch__deep_search` | 無料（250回/日） | メイン調査 |
+| `mcp__chatgpt__chatgpt_send_and_get_response` | サブスク内（250回/月） | 並列調査・補完 |
+| `mcp__perplexity-web__perplexity_ask` | ~$0.4-1.3/回 | 重要軸の補完（1テーマ最大3回） |
 
-コスト管理: Gemini + ChatGPT で全軸並列実行 → Perplexityは最重要軸のみ（1テーマ最大3回目安）
+### SNSリアルタイム（最新情報）
+| MCP | コスト | 用途 |
+|-----|--------|------|
+| `mcp__social-superpowers__twitter-search` | 無料 | X/Twitter + Reddit リアルタイム検索 |
+| `mcp__google-news-trends__*` | 無料 | 最新ニュース + トレンド |
+| `mcp__grok__search_posts` | $5/1,000回 | X特化の深い検索（日付・ハンドルフィルタ可） |
+
+コスト管理: Gemini + ChatGPT + social-superpowers + google-news-trends で全軸並列実行（無料枠/サブスク内） → Perplexityは最重要軸のみ、Grokは必要時のみ
 
 ## Sub-Agents
 
@@ -115,6 +125,7 @@ MCP経由で**自動実行**する。ユーザーの手動操作は不要。
 | WebSearch / WebFetch | 個別検索・URL取得 | 組み込み |
 | social-superpowers | X/Twitter + Reddit 検索 | 不要 |
 | google-news-trends | Google News + Trends | 不要 |
+| grok | Grok X Search（X/Twitterリアルタイム検索） | xAI APIキー |
 | playwright | ブラウザ自動操作 | 不要 |
 | Notion | 社内情報検索 | 設定済み |
 | github | GitHubリポジトリ分析（コード・Issue・PR） | gh CLI連携 |

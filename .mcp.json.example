@@ -42,6 +42,14 @@
       ],
       "env": {}
     },
+    "grok": {
+      "type": "stdio",
+      "command": "uvx",
+      "args": ["grok-mcp"],
+      "env": {
+        "XAI_API_KEY": "${XAI_API_KEY}"
+      }
+    },
     "github": {
       "type": "stdio",
       "command": "/bin/sh",
