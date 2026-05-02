@@ -34,7 +34,7 @@ Deep Search結果で不足する情報を `WebSearch` で補完:
 
 Deep Search が弱い領域を専用MCPで補完:
 - X/Twitter, Reddit: `mcp__social-superpowers__*`
-- ニュース・トレンド: `mcp__google-news-trends__*`
+- ニュース・トレンド: `mcp__google-news-trends__*`（**必ず `summarize=false` を指定**。デフォルトのsummarize=trueはMCP Samplingを試行しスタックする）
 
 ### Step 3: 詳細取得・確認
 

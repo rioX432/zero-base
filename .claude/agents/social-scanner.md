@@ -19,6 +19,10 @@ maxTurns: 30
 2. **ポジティブ/ネガティブの両面を公平に収集**
 3. **サンプルサイズが小さい場合は「少数の反応に基づく」と注記**
 
+## 重要な制約
+
+- `mcp__google-news-trends__*` の news系ツール（get_news_by_keyword等）は**必ず `summarize=false` を指定**する。デフォルトのsummarize=trueはMCP Samplingを試行しスタックする。
+
 ## 調査チャネルと手法
 
 ### X/Twitter

@@ -101,7 +101,7 @@ mcp__perplexity-web__perplexity_ask(query="{調査クエリ}")  # 最重要軸�
 ```
 mcp__social-superpowers__twitter-search(query="{テーマ関連キーワード}")
 mcp__social-superpowers__reddit-search(query="{テーマ関連キーワード}")
-mcp__google-news-trends__get_news_by_keyword(keyword="{テーマ}")
+mcp__google-news-trends__get_news_by_keyword(keyword="{テーマ}", summarize=false)
 mcp__google-news-trends__get_trending_terms(geo="JP")
 ```
 
@@ -116,7 +116,7 @@ mcp__grok__get_trends()
 - **Perplexity**: ソースURL付きで構造化された回答を返す
 - **ChatGPT**: Web検索付きで回答
 - **social-superpowers**: X/Twitter + Redditのリアルタイム検索。無料・APIキー不要
-- **google-news-trends**: 最新ニュース + トレンドワード
+- **google-news-trends**: 最新ニュース + トレンドワード。**news系ツールは必ず `summarize=false` を指定**（デフォルトtrueはMCP Samplingでスタックする）
 - **Grok**: xAI API経由のX/Twitter深層検索。日付範囲フィルタ、ハンドル指定が可能
 
 #### クエリ設計ルール
