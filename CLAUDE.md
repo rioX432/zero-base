@@ -1,6 +1,6 @@
 # Zero-Base Thinking Project
 
-ゼロベース思考で網羅的調査→本質抽出→論理的提案を行う。
+ゼロベース思考で網羅的調査→本質抽出→論理的提案を行う。リサーチ→設計→Issue作成まで一気通貫で対応。
 
 ## 基本原則
 
@@ -9,6 +9,7 @@
 3. **MECE**: 調査軸は漏れなくダブりなく設計
 4. **ピラミッド原則**: 結論→根拠→データの順で構造化
 5. **Generator-Critic**: 提案後に必ず反論検証（counter-argument agent）
+6. **チャット報告**: 各Phase完了時にファイル保存+チャットで要点を説明。ファイル作成のみで終わらない
 
 ## Skill
 
@@ -27,7 +28,7 @@
   Phase 1: Scoping + 並列情報収集
   │  ├─ 調査設計
   │  ├─ Deep Search（Gemini + ChatGPT + Perplexity）
-  │  ├─ SNSリアルタイム（social-superpowers + google-news-trends）
+  │  ├─ SNSリアルタイム（social-superpowers）
   │  └─ Grok X Search（APIキー設定時）
   │
   Phase 2: Research（結果統合 + 補完調査）
@@ -40,10 +41,17 @@
   │  ├─ social-scanner（反響調査）
   │  └─ 必要時: 追加Deep SearchをMCP経由で自動実行
   │
+  Phase 3.5: ★ ユーザーとの調査結果確認
+  │
   Phase 4: Synthesis（本質の特定）← メインAgentが実行
   │
   Phase 5: Proposal（提案 + 反論検証）
-       └─ counter-argument で検証
+  │    └─ counter-argument で検証
+  │
+  ├─ 終了（リサーチのみ）
+  └─ → Phase D: 詳細設計（Codex必須連携）
+        ├─ 終了（設計のみ）
+        └─ → Phase I: Dev Ready Issue作成
 ```
 
 ### リポジトリ分析モード
@@ -56,21 +64,14 @@
   │  ├─ 機能マップ作成
   │  └─ ★ ユーザーに機能マップを確認
   │
-  Phase 1: Scoping + 並列情報収集（競合・先行事例調査）
-  │  ├─ 自リポジトリの領域に合わせた調査設計
-  │  └─ Deep Search + SNSリアルタイム + Grok で並列実行
-  │
-  Phase 2-3: Research + Deep Dive（競合分析）
+  Phase 1-3: 競合・先行事例調査
   │
   Phase 4: Gap Analysis（差分特定）
-  │  ├─ 機能比較マトリクス
-  │  ├─ ポジショニング分析（強み/弱み/機会/脅威）
-  │  └─ 本質: 選ばれる理由 / 選ばれない理由
   │
   Phase 5: Roadmap Proposal（ロードマップ提案）
-       ├─ 短期/中期/長期の優先度付き施策
-       ├─ 2パターンのロードマップ
-       └─ counter-argument で検証
+  │
+  ├─ 終了（リサーチのみ）
+  └─ → Phase D → Phase I（設計・Issue作成が必要な場合）
 ```
 
 ★ = ユーザーとの対話ポイント
@@ -84,16 +85,15 @@ MCP経由で**自動実行**する。Phase 1 で全て同時並列実行。
 |-----|--------|------|
 | `mcp__gemini-deepsearch__deep_search` | 無料（250回/日） | メイン調査 |
 | `mcp__chatgpt__chatgpt_send_and_get_response` | サブスク内（250回/月） | 並列調査・補完 |
-| `mcp__perplexity-web__perplexity_ask` | ~$0.4-1.3/回 | 重要軸の補完（1テーマ最大3回） |
+| `mcp__perplexity-web__perplexity_ask` | Sonar $1/$1/MTok, Pro $3/$15/MTok | 重要軸の補完（1テーマ最大3回） |
 
 ### SNSリアルタイム（最新情報）
 | MCP | コスト | 用途 |
 |-----|--------|------|
 | `mcp__social-superpowers__twitter-search` | 無料 | X/Twitter + Reddit リアルタイム検索 |
-| `mcp__google-news-trends__*` | 無料 | 最新ニュース + トレンド |
 | `mcp__grok__search_posts` | $5/1,000回 | X特化の深い検索（日付・ハンドルフィルタ可） |
 
-コスト管理: Gemini + ChatGPT + social-superpowers + google-news-trends で全軸並列実行（無料枠/サブスク内） → Perplexityは最重要軸のみ、Grokは必要時のみ
+コスト管理: Gemini + ChatGPT + social-superpowers で全軸並列実行（無料枠/サブスク内） → Perplexityは最重要軸のみ、Grokは必要時のみ
 
 ## Sub-Agents
 
@@ -112,7 +112,28 @@ MCP経由で**自動実行**する。Phase 1 で全て同時並列実行。
 - `repo-analysis.md` — リポジトリ分析結果・機能マップ（リポジトリ分析モード）
 - `research.md` — 収集情報一覧（ソース付き）
 - `analysis.md` — 深掘り分析
-- `proposal.md` — 最終提案・ロードマップ（依頼者に見せるもの）
+- `proposal.md` — 最終提案・ロードマップ
+- `design.md` — 詳細設計・Mermaid図（Phase D実施時）
+
+## Phase D: 詳細設計（Codex必須連携）
+
+技術設計（シーケンス、アーキテクチャ、テックスタック選定等）は**必ずCodexと共同で実施**する。
+
+1. **Claude起案**: リサーチ結果からアーキテクチャ案 + Mermaid図
+2. **Codex検証（必須）**: `mcp__codex__codex` で設計案を送付し独立検証
+3. **クロスバリデーション**: Claude vs Codex の判断差分を解決
+4. **保存**: `design.md` に Mermaid図・設計判断ログ含め保存
+
+## Phase I: Dev Ready Issue作成
+
+**Phase D完了が前提。** 設計内容を丁寧にIssue本文に記載し、開発者がすぐ着手可能な状態にする。
+
+Issue本文に含める情報:
+- 背景・目的（リサーチ参照）
+- 設計概要（Mermaid図）
+- 技術スタック・実装方針
+- 受け入れ基準（Acceptance Criteria）
+- テスト方針・見積もり
 
 ## 自社コンテキスト
 
@@ -124,11 +145,11 @@ MCP経由で**自動実行**する。Phase 1 で全て同時並列実行。
 |-----|------|------|
 | WebSearch / WebFetch | 個別検索・URL取得 | 組み込み |
 | social-superpowers | X/Twitter + Reddit 検索 | 不要 |
-| google-news-trends | Google News + Trends | 不要 |
 | grok | Grok X Search（X/Twitterリアルタイム検索） | xAI APIキー |
 | playwright | ブラウザ自動操作 | 不要 |
 | Notion | 社内情報検索 | 設定済み |
 | github | GitHubリポジトリ分析（コード・Issue・PR） | gh CLI連携 |
+| codex | OpenAI Codex（設計検証・ベストプラクティスチェック） | Codex CLI |
 
 ## 品質基準
 
@@ -138,3 +159,6 @@ MCP経由で**自動実行**する。Phase 1 で全て同時並列実行。
 - source-verifier でURL実在確認済み
 - counter-argument で反論検証済み
 - 論理チェーン（事実→推論→結論）が第三者に説明可能
+- **各Phaseでチャットによる説明を実施**
+- **（Phase D実施時）Codexによる設計検証済み**
+- **（Phase I実施時）IssueがDev Ready状態**

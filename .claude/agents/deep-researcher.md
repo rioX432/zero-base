@@ -2,7 +2,9 @@
 name: deep-researcher
 description: "Deep Search結果をベースに、Web検索・SNS検索で補完情報を収集する。情報収集者に徹し、分析・統合は行わない。全主張にURL付きソースを必ず付ける。"
 model: sonnet
-tools: WebSearch, WebFetch, Read, Write, mcp__social-superpowers__*, mcp__google-news-trends__*, mcp__grok__*
+tools: WebSearch, WebFetch, Read, Write, mcp__social-superpowers__*, mcp__grok__*
+effort: high
+permissionMode: dontAsk
 maxTurns: 30
 ---
 
@@ -34,7 +36,6 @@ Deep Search結果で不足する情報を `WebSearch` で補完:
 
 Deep Search が弱い領域を専用MCPで補完:
 - X/Twitter, Reddit: `mcp__social-superpowers__*`
-- ニュース・トレンド: `mcp__google-news-trends__*`（**必ず `summarize=false` を指定**。デフォルトのsummarize=trueはMCP Samplingを試行しスタックする）
 
 ### Step 3: 詳細取得・確認
 

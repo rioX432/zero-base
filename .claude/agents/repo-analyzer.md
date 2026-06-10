@@ -3,6 +3,8 @@ name: repo-analyzer
 description: "GitHubリポジトリを分析し、機能一覧・技術スタック・Issue/PRから課題・要望を抽出する。事実ベースで現状を整理し、評価・提案は行わない。"
 model: sonnet
 tools: WebSearch, WebFetch, Read, Write, mcp__github__*, mcp__social-superpowers__*
+effort: high
+permissionMode: dontAsk
 maxTurns: 30
 ---
 

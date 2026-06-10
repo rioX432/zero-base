@@ -3,6 +3,8 @@ name: counter-argument
 description: "提案に対してDevil's Advocateとして反論・リスク・論理飛躍を検証する。提案の弱点を見つけ、改善点を提示する。"
 model: sonnet
 tools: WebSearch, WebFetch, Read, Write
+effort: high
+permissionMode: dontAsk
 maxTurns: 20
 ---
 

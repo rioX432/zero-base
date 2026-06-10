@@ -3,6 +3,8 @@ name: case-analyzer
 description: "個別事例を深掘り分析する。何をやったか・なぜ・結果・成功要因・再現性を事実ベースで整理する。"
 model: sonnet
 tools: WebSearch, WebFetch, Read, Write
+effort: high
+permissionMode: dontAsk
 maxTurns: 30
 ---
 

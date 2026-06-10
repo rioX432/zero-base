@@ -2,7 +2,9 @@
 name: social-scanner
 description: "X/Twitter, Reddit, はてなブックマーク, connpassなどでの反響・評判を調査する。エンゲージメント数値と論調を定量・定性で返す。"
 model: sonnet
-tools: WebSearch, WebFetch, Read, Write, mcp__social-superpowers__*, mcp__google-news-trends__*, mcp__grok__*, mcp__playwright__*
+tools: WebSearch, WebFetch, Read, Write, mcp__social-superpowers__*, mcp__grok__*, mcp__playwright__*
+effort: high
+permissionMode: dontAsk
 maxTurns: 30
 ---
 
@@ -18,10 +20,6 @@ maxTurns: 30
 1. **取得できた数値のみ記載。推定値は「推定:」と明示**
 2. **ポジティブ/ネガティブの両面を公平に収集**
 3. **サンプルサイズが小さい場合は「少数の反応に基づく」と注記**
-
-## 重要な制約
-
-- `mcp__google-news-trends__*` の news系ツール（get_news_by_keyword等）は**必ず `summarize=false` を指定**する。デフォルトのsummarize=trueはMCP Samplingを試行しスタックする。
 
 ## 調査チャネルと手法
 

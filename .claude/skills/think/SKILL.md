@@ -1,374 +1,270 @@
 ---
 name: think
-description: テーマを受け取り、ゼロベース思考で網羅的調査→本質抽出→論理的提案を実行する。事実ベース・ソース付き・反論検証済みの提案を生成する。
-argument-hint: [テーマ・依頼内容（リポジトリURLを含む場合はリポジトリ分析モードで実行）]
+description: テーマを受け取り、ゼロベース思考で網羅的調査→本質抽出→論理的提案を実行する。技術設計やIssue作成まで一気通貫で対応。
+when_to_use: |
+  Researching a topic, analyzing competitors, evaluating tech stacks,
+  creating proposals, technical design with architecture diagrams,
+  creating dev-ready GitHub issues from research findings
+argument-hint: "[テーマ・依頼内容（リポジトリURLを含む場合はリポジトリ分析モードで実行）]"
 disable-model-invocation: true
-allowed-tools: Read, Write, Glob, Grep, Agent, WebSearch, WebFetch, AskUserQuestion, mcp__claude_ai_Notion__notion-fetch, mcp__claude_ai_Notion__notion-search, mcp__gemini-deepsearch__deep_search, mcp__perplexity-web__perplexity_search, mcp__perplexity-web__perplexity_ask, mcp__chatgpt__chatgpt_send_and_get_response, mcp__social-superpowers__*, mcp__google-news-trends__*, mcp__grok__*
-effort: max
+allowed-tools: Read, Write, Glob, Grep, Agent, WebSearch, WebFetch, AskUserQuestion, mcp__claude_ai_Notion__notion-fetch, mcp__claude_ai_Notion__notion-search, mcp__gemini-deepsearch__deep_search, mcp__perplexity-web__perplexity_search, mcp__perplexity-web__perplexity_ask, mcp__chatgpt__chatgpt_send_and_get_response, mcp__social-superpowers__*, mcp__grok__*, mcp__codex__codex, mcp__codex__codex-reply, mcp__github__create_issue, mcp__github__add_issue_comment, mcp__github__list_issues, effort: max
 ---
 
 # /think — ゼロベース思考オーケストレータ
 
 `$ARGUMENTS` について調査・分析・提案を行う。
 
-出力テンプレートは `${CLAUDE_SKILL_DIR}/templates.md` を参照。
+テンプレートは `${CLAUDE_SKILL_DIR}/references/` を参照:
+- `references/templates.md` — リサーチ・提案テンプレート
+- `references/design-templates.md` — 設計・Issue テンプレート
 
 ## モード判定
 
 `$ARGUMENTS` にGitHubリポジトリURL（`github.com/...`）が含まれる場合:
-→ **リポジトリ分析モード**で実行（Phase 0 + Phase 4をGap Analysisに変更）
+→ **リポジトリ分析モード**（Phase 0 + Phase 4をGap Analysisに変更）
 
 含まれない場合:
-→ **通常モード**で実行（Phase 0をスキップ）
+→ **通常モード**（Phase 0をスキップ）
+
+## フロー概要
+
+```
+Phase 0: Repo Analysis（リポジトリ分析モードのみ）
+Phase 1: Scoping + 並列情報収集
+Phase 2: Research（結果統合 + 補完調査）
+Phase 3: Deep Dive（深掘り分析）
+Phase 3.5: ★ ユーザーとの調査結果確認
+Phase 4: Synthesis（本質の特定）
+Phase 5: Proposal（提案 + 反論検証）
+  ├─ 終了（リサーチのみ）
+  └─ → Phase D: 詳細設計（Codex必須連携）
+        ├─ 終了（設計のみ）
+        └─ → Phase I: Dev Ready Issue作成（設計完了が前提）
+```
+
+## 報告ルール（★全Phase共通）
+
+**各Phase完了時、ファイル保存に加えて必ずチャットで以下を説明する:**
+- 何がわかったか（調査結果の要点）
+- なぜその判断をしたか（根拠）
+- 次に何をするか
+
+ファイル作成のみで報告を省略しない。ユーザーは全ファイルを読む前提で作業していない。
 
 ## 事前読み込み
 
 1. `CLAUDE.md` — 原則確認
 2. `CONTEXT.md` — 自社コンテキスト（存在すれば）
 3. `workspace/` — 同テーマの過去調査（存在すれば）
-4. **Notion等の社内情報** — 既存の施策・実績・計画を早い段階で把握する（後から判明すると手戻りが発生する）
+4. **Notion等の社内情報** — 既存の施策・実績・計画の早期把握
 
 ---
 
 ## Phase 0: Repo Analysis（リポジトリ分析モードのみ）
 
-**自リポジトリの現状を客観的に把握する。ここが全ての起点。**
+`repo-analyzer` agent で対象リポジトリの現状を収集 → 機能マップ作成 → **ユーザーに確認してからPhase 1へ**。
 
-### 0.1 リポジトリ分析
-
-`repo-analyzer` agent を起動し、対象リポジトリの現状を収集:
-- 基本情報（Star, Fork, 技術スタック, ライセンス）
-- 機能一覧（コードを実際に読んで把握）
-- Issue/PRから課題・要望を抽出
-- 外部評価（ダウンロード数、SNS言及、ブログ記事）
-- ドキュメントの充実度
-
-複数リポジトリが指定された場合は並列で `repo-analyzer` を起動。
-
-### 0.2 機能マップの作成
-
-repo-analyzer の結果から**機能マップ**を作成（テンプレート参照）。
-結果を `workspace/{テーマ名}/repo-analysis.md` に保存。
-
-### 0.3 ユーザーとの確認
-
-機能マップをユーザーに提示し確認:
-- **抜けている機能はないか**（READMEに書いてないが実装済みの機能など）
-- **分類は正しいか**（コア機能 vs 基本機能の判断）
-- **開発中の機能はあるか**（Issue/PRに出ていないWIP）
-
-**→ ユーザーの確認を得てからPhase 1に進む。**
+詳細はCLAUDE.mdのPhase 0セクション参照。
 
 ---
 
-## Phase 1: Scoping + Deep Search実行
+## Phase 1: Scoping + 並列情報収集
 
 ### 1.1 テーマの分解
 
-`$ARGUMENTS` から以下を特定:
-- **What**: 調査対象
-- **Why**: 背景・目的
-- **Who**: 提案の受け手（CTO、経営陣など）
-- **Output**: 求められる形（比較表、計画案など）
-- **Constraints**: 制約条件
-
-曖昧な場合は AskUserQuestion で確認（1回、最大3問）。
-
-テーマをMECEに**調査軸**へ分解する。
-
-**リポジトリ分析モードの場合の調査軸（例）:**
-- 同カテゴリの競合OSS/サービスの機能比較
-- ユーザーが抱える課題（競合のIssue/フォーラムも調査）
-- 技術トレンドとの整合性（この領域で今後求められる機能）
-- 成功しているOSSの成長戦略（コミュニティ運営、リリース戦略）
+`$ARGUMENTS` から What/Why/Who/Output/Constraints を特定。曖昧な場合はAskUserQuestionで確認（1回、最大3問）。テーマをMECEに調査軸へ分解。
 
 ### 1.2 並列情報収集（MCP経由・自動）
 
-調査軸に基づき、**Deep Search + SNSリアルタイム検索を同時並列実行**する。
-
-#### 実行方法
-
 **全てを同時に並列実行する**（Layer間に依存関係なし）:
 
-**Layer 1: Deep Search（網羅的な背景調査）**
+**Layer 1: Deep Search**
 ```
 mcp__gemini-deepsearch__deep_search(query="{調査クエリ}", effort="high")
 mcp__chatgpt__chatgpt_send_and_get_response(message="Search the web: {調査クエリ}. Include source URLs.")
 mcp__perplexity-web__perplexity_ask(query="{調査クエリ}")  # 最重要軸のみ
 ```
 
-**Layer 2: SNSリアルタイム（最新の声・トレンド）**
+**Layer 2: SNSリアルタイム**
 ```
-mcp__social-superpowers__twitter-search(query="{テーマ関連キーワード}")
-mcp__social-superpowers__reddit-search(query="{テーマ関連キーワード}")
-mcp__google-news-trends__get_news_by_keyword(keyword="{テーマ}", summarize=false)
-mcp__google-news-trends__get_trending_terms(geo="JP")
+mcp__social-superpowers__twitter-search(query="{キーワード}")
+mcp__social-superpowers__reddit-search(query="{キーワード}")
 ```
 
-**Layer 3: Grok X Search（X特化の深い検索）** ※XAI_API_KEY設定時のみ
+**Layer 3: Grok X Search** ※XAI_API_KEY設定時のみ
 ```
-mcp__grok__search_posts(query="{テーマ関連キーワード}")
-mcp__grok__get_trends()
+mcp__grok__search_posts(query="{キーワード}")
 ```
-
-各MCPの特性:
-- **Gemini**: 最も詳細な結果を返す。JSONファイルに保存されるのでReadで読む
-- **Perplexity**: ソースURL付きで構造化された回答を返す
-- **ChatGPT**: Web検索付きで回答
-- **social-superpowers**: X/Twitter + Redditのリアルタイム検索。無料・APIキー不要
-- **google-news-trends**: 最新ニュース + トレンドワード。**news系ツールは必ず `summarize=false` を指定**（デフォルトtrueはMCP Samplingでスタックする）
-- **Grok**: xAI API経由のX/Twitter深層検索。日付範囲フィルタ、ハンドル指定が可能
-
-#### クエリ設計ルール
-- 調査軸ごとに1クエリ（軸が多い場合は重要度順に2〜3クエリに統合）
-- **Deep Search向け**: ソースURL付きで回答するよう指示を含める
-- **SNS検索向け**: 短いキーワード（ハッシュタグ、製品名、技術名など）
-- 日本の事例が重要な場合は日本語クエリと英語クエリの両方を実行
 
 #### コスト管理
-- **Gemini + ChatGPT + social-superpowers + google-news-trends で全軸を並列実行**（全て無料枠/サブスク内）
-- Perplexity は最重要軸のみに使用（有料、~$0.4-1.3/回、1テーマ最大3回目安）
-- Grok X Search は $5/1,000回（APIキー設定時のみ、重要なX情報がある軸に使用）
+- **Gemini + ChatGPT + social-superpowers で全軸並列**（無料枠/サブスク内）
+- Perplexity: Sonar $1/$1/MTok、Sonar Pro $3/$15/MTok（最重要軸のみ、1テーマ最大3回）
+- Grok: $5/1,000回（重要なX情報がある軸のみ）
 
 ---
 
 ## Phase 2: Research（結果統合 + 補完調査）
 
-### 2.1 Deep Search結果の読み込み
+1. Deep Search結果を読み込み（Geminiは JSON → Read、他は直接テキスト）
+2. **クロスバリデーション**: 複数ソース一致 → 高、単一ソース → 中、矛盾 → WebSearchで追加確認
+3. **補完調査**: `deep-researcher` agent で不足情報を補完
+4. **ソース検証**: `source-verifier` agent で全URL検証（Deep SearchのURLは捏造可能性あり）
+5. 統合して `workspace/{テーマ名}/research.md` に保存
 
-Phase 1.2 で実行した3つのMCP Deep Search（Gemini / Perplexity / ChatGPT）の結果を読み込む。
-- Gemini は JSON ファイルパスを返すので Read で読む
-- Perplexity は直接テキストを返す
-- ChatGPT は直接テキストを返す
-
-### 2.2 クロスバリデーション
-
-Deep Search結果（Gemini/ChatGPT/Perplexity）とSNSリアルタイム結果（social-superpowers/google-news-trends/Grok）を突き合わせる:
-- **複数ソース一致** → 信頼度「高」
-- **Deep SearchとSNSで一致** → 信頼度「高」（情報の鮮度も確認済み）
-- **Deep Searchのみ** → 信頼度「中」（最新状況をSNSで再確認）
-- **SNSのみ** → 信頼度「中」（速報性あるが裏取り必要）
-- **矛盾する情報** → 全ソースを記載し、WebSearchで追加確認
-
-### 2.3 補完調査
-
-Phase 1の結果で不足する情報を `deep-researcher` agent で補完:
-- Phase 1のSNS検索で拾えなかったニッチな情報源（connpass, 個人ブログ, Zenn等）
-- 日本ローカルの情報（Deep SearchもSNSも弱い領域）
-- 特定ユーザー・特定スレッドの深掘り
-
-### 2.4 ソース検証
-
-`source-verifier` agent を起動し、**Deep Search結果を含む全URL**を検証。
-- Deep Search のURLは捏造の可能性あり（特にGemini）→ 必ず検証
-- DEAD_LINK → 除外
-- SOURCE_MISMATCH → 修正または除外
-
-### 2.5 統合・一覧化
-
-全結果を統合（テンプレート参照）。
-結果を `workspace/{テーマ名}/research.md` に保存。
-
-**→ ユーザーに収集結果を共有。追加調査の指示があれば対応。**
+**→ チャットで収集結果を共有。**
 
 ---
 
 ## Phase 3: Deep Dive（深掘り分析）
 
-### 3.1 対象選定
-
-Phase 2 から提案に直結する重要事例を3〜7件選定:
-- 自社コンテキストとの類似性
-- 成功/失敗の学びが明確か
-- 情報の充実度
-
-### 3.2 並列深掘り
-
-事例ごとに `case-analyzer` agent を**並列起動**。分析観点:
-- 何をやったか（具体的施策）
-- なぜそうしたか（背景・狙い）
-- 結果（定量/定性。公開情報なしの場合は明記）
-- 成功/失敗の要因
-- 再現性（自社で同じことができるか）
-
-### 3.3 反響調査（テーマがイベント・施策系の場合）
-
-**複数手法を組み合わせて網羅的に調査する。1つの手法だけで「反響なし」と結論しない。**
-
-#### 手法1: X/Twitter検索（social-superpowers MCP）
-- twitter-search でキーワード・ハッシュタグ検索
-- twitter-read で特定ツイートのエンゲージメント（いいね/RT/IMP）を実測
-- twitter-user-tweets で関係者の投稿を確認
-- **注意: APIは直近数ヶ月のツイートを優先的に返す傾向があり、古いツイートは取得できない場合がある**
-
-#### 手法2: Playwrightでのブラウザ取得
-- **connpass等の403を返すサイトはPlaywrightで取得する**（WebFetchでは403になるがPlaywrightなら取得可能）
-- connpassの参加者数、メンバー数、イベント詳細を取得
-- **注意: connpassのメンバー数は「現時点の累計」であり、イベント開催時の数字ではない。誤解を生む場合は使用を避ける**
-
-#### 手法3: ユーザーによるX公式検索
-- X検索APIで取得できない古いツイートや、日付フィルタ付き検索が必要な場合
-- ユーザーに検索クエリを提示し、結果（スクリーンショットやテキスト）を共有してもらう
-- 例: `"イベント名" until:2024-11-10 since:2024-10-30`
-
-#### 手法4: Web検索でのブログ・レポート記事
-- WebSearch で「イベント名 参加 感想 レポート」等を検索
-- **X投稿だけでなく、note/Zenn/はてなブログ等の参加者レポートも確認する**
-
-#### 反響データの記録ルール
-- **未取得データには必ず理由を明記する**（「0件」と「未調査」は異なる）
-- 理由の分類: API制約（時間範囲外）、サイト制約（403）、ハンドル未特定、検索ヒットなし
-- **全ての「0件」はクロスチェック済みか明記する**
-
-### 3.4 追加情報収集（必要な場合）
-
-深掘り中に情報が大幅に不足する場合、追加のDeep Search・SNS検索をMCP経由で自動実行する。
-
-```
-# Deep Search追加
-mcp__gemini-deepsearch__deep_search(query="{不足情報に特化したクエリ}", effort="high")
-mcp__chatgpt__chatgpt_send_and_get_response(message="Search the web: {不足情報に特化したクエリ}. Include source URLs.")
-
-# SNSリアルタイム追加
-mcp__social-superpowers__twitter-search(query="{不足情報のキーワード}")
-mcp__grok__search_posts(query="{不足情報のキーワード}")
-
-# 重要な不足の場合のみPerplexityも追加
-mcp__perplexity-web__perplexity_ask(query="{不足情報に特化したクエリ}")
-```
-
-結果を統合して分析を続行。
-結果を `workspace/{テーマ名}/analysis.md` に保存。
+1. Phase 2から重要事例を3〜7件選定
+2. `case-analyzer` agent を**並列起動**
+3. 反響調査が必要な場合: `social-scanner` agent（複数手法を組み合わせ）
+4. 情報不足時: 追加Deep Search/SNS検索をMCP経由で自動実行
+5. `workspace/{テーマ名}/analysis.md` に保存
 
 ---
 
-## Phase 3.5: ユーザーとの調査結果確認（★重要）
+## Phase 3.5: ★ ユーザーとの調査結果確認
 
-**Phase 4に進む前に、必ずユーザーと調査結果を確認する。**
+**Phase 4に進む前に必須。**
 
-1. **調査結果を表形式でまとめてユーザーに共有する**
-   - 全事例の比較表（1つの表で各社の傾向が見えるように）
-   - 未取得データには理由を明記
-2. **ユーザーに「この情報は正しいか」を確認してもらう**
-   - 特に「0件」「反響なし」等の否定的結論は疑ってかかる
-   - ユーザーが自身で検証できる検索クエリやリンクを提供する
-3. **ユーザーのフィードバックを受けて修正・追加調査を行う**
-
-**提案に飛ぶ前にこのステップを必ず踏む。調査結果が間違っていると提案全体が崩れる。**
+1. 調査結果を**表形式でチャットに共有**
+2. 「0件」「反響なし」等の否定的結論はユーザーに検証を依頼
+3. フィードバックを受けて修正・追加調査
 
 ---
 
 ## Phase 4: Synthesis（本質の特定）
 
-**ここはメインAgent（自分）が実行。Sub-Agentに委譲しない。**
+**メインAgent（自分）が実行。Sub-Agentに委譲しない。**
 
-### 通常モード
-
-全事例を横断して抽出:
-
-1. **共通パターン**: 成功事例に共通する要素
-2. **差別化要因**: 際立って成功した事例の独自要素
-3. **失敗パターン**: 避けるべきアンチパターン
-4. **前提条件**: 成功に必要な前提（規模、知名度、リソース等）— **自社がその前提を満たしているか必ず確認**
-
-パターンから**本質**を1〜3文で定義（テンプレート参照）。
-
-### リポジトリ分析モード: Gap Analysis
-
-Phase 0 の機能マップとPhase 2-3 の競合調査を突き合わせ、差分を特定する。
-
-#### 4.1 機能比較マトリクス（テンプレート参照）
-#### 4.2 ポジショニング分析（テンプレート参照）
-
-#### 4.3 本質の特定
-
-通常モードと同様に、パターンから本質を抽出。加えて:
-- **このリポジトリが選ばれる理由**は何か（現状）
-- **選ばれない理由**は何か（現状）
-- **今後選ばれるために**何が必要か
+通常モード: 共通パターン・差別化要因・失敗パターン・前提条件を抽出 → 本質を1〜3文で定義。
+リポジトリ分析モード: 機能比較マトリクス + ポジショニング分析 + 本質特定。
 
 ---
 
-## Phase 5: Proposal（提案生成 + 反論検証）
+## Phase 5: Proposal（提案 + 反論検証）
 
-### 5.1 提案構築
+1. **2案生成**（通常）/ **2パターンのロードマップ**（リポジトリ分析）
+2. `counter-argument` agent で反論検証
+3. 提案比較表を作成
+4. `workspace/{テーマ名}/proposal.md` に保存
 
-**リポジトリ分析モードの場合**: Phase 4 のGap Analysisに基づき、**ロードマップ提案**を生成する（5.1r参照）。
-**通常モードの場合**: Phase 4 の本質を自社コンテキストに適用し、**2案**生成（テンプレート参照）。
+**→ チャットで提案の要点と推奨理由を説明。**
 
-**提案の全ての判断に「なぜそう言えるか」のデータを紐づける。根拠のない主張はしない。**
-
-### 5.1r ロードマップ提案（リポジトリ分析モード）
-
-Phase 4 のGap Analysisに基づき、優先度付きロードマップを生成（テンプレート参照）。
-ロードマップは**2パターン**生成（例: 攻め重視 vs 守り重視、OSS成長 vs 商用化 等）。
-
-### 5.2 反論検証
-
-`counter-argument` agent を起動し検証:
-- この提案が失敗する原因は何か
-- 根拠のどこに論理飛躍があるか
-- 見落としているリスクは何か
-- より良い代替案はないか
-- **他社事例の前提条件を自社が満たしているかの検証**
-
-検証結果を提案に統合。
-
-### 5.3 比較表
-
-提案比較表を作成（テンプレート参照）。
-`workspace/{テーマ名}/proposal.md` に保存。
+テーマが技術設計を必要とする場合 → Phase D へ。そうでなければここで完了。
 
 ---
 
-## 品質チェック（Phase 5 完了前に必ず確認）
+## Phase D: 詳細設計（Codex必須連携）
+
+**リサーチ結果をもとに技術設計を行う場合に実行。**
+コードの設計・詳細設計（シーケンス、アーキテクチャ、テックスタック選定等）は**必ずCodexと共同で実施**する。
+
+テンプレートは `references/design-templates.md` を参照。
+
+### D.1 Claude起案
+
+リサーチ結果から設計案を策定:
+- アーキテクチャ案をMermaid図で可視化（システム構成図 / シーケンス図 / コンポーネント図）
+- 技術選定の根拠をリサーチ結果にリンク
+- 設計判断ログ（何を・なぜ・どの選択肢から選んだか）
+
+### D.2 Codex検証（必須）
+
+`mcp__codex__codex` で設計案をCodexに送付し、独立検証を受ける:
+
+```
+mcp__codex__codex(
+  prompt="以下の設計案を検証してください。ベストプラクティス・設計パターンの観点から問題点、代替案、リスクを指摘してください。\n\n{設計案}",
+  developer-instructions="You are a senior architect reviewing a technical design. Focus on: (1) design pattern correctness, (2) scalability concerns, (3) tech stack fitness, (4) implementation feasibility. If a target repository is provided, read the actual codebase to validate assumptions.",
+  cwd="{対象リポジトリのパス（あれば）}",
+  sandbox="read-only"
+)
+```
+
+Codexの指摘に対して `mcp__codex__codex-reply` で対話しながら設計を詰める。
+
+### D.3 クロスバリデーション
+
+| 判断ポイント | Claude案 | Codex案 | 最終決定 | 根拠 |
+|-------------|---------|---------|---------|------|
+
+差分がある箇所は根拠を突き合わせて解決。
+
+### D.4 保存と報告
+
+- `workspace/{テーマ名}/design.md` に保存（Mermaid図・設計判断ログ含む）
+- **チャットで設計の全体像、主要な判断とその理由を説明**
+
+Issue作成が必要な場合 → Phase I へ。
+
+---
+
+## Phase I: Dev Ready Issue作成
+
+**Phase D（詳細設計）が完了していることが前提。**
+
+テンプレートは `references/design-templates.md` の「Dev Ready Issue」を参照。
+
+### I.1 Issue分割
+
+設計を実装可能な単位に分割。各Issueが独立して着手可能なサイズにする。
+
+### I.2 Issue本文の作成
+
+各Issueに以下を含める:
+- **背景・目的**: リサーチ結果への参照
+- **設計概要**: Mermaid図（アーキテクチャ・シーケンス）
+- **技術スタック・依存関係**
+- **実装方針**: ファイル単位の変更内容
+- **受け入れ基準（Acceptance Criteria）**: チェックリスト形式
+- **テスト方針**
+- **参考リンク**: リサーチソース・設計ドキュメント
+- **見積もり**: 工数・複雑度
+
+### I.3 Issue作成
+
+`mcp__github__create_issue` でIssueを作成。
+
+### I.4 報告
+
+**チャットでIssue一覧と各Issueの概要を説明。**
+
+---
+
+## 品質チェック（最終確認）
 
 - [ ] 全事実主張にURL付きソースがあるか
 - [ ] source-verifier でURL検証済みか
 - [ ] 推測と事実が区別されているか
-- [ ] 論理の飛躍がないか
 - [ ] counter-argument の反論検証を通過しているか
-- [ ] 依頼者が「どちらを選ぶか」に集中できる形か
-- [ ] **未取得データに理由が明記されているか**
-- [ ] **他社事例の前提条件と自社の条件の差異が明記されているか**
-- [ ] **結果は表形式で見やすくまとめられているか**
-- [ ] **ユーザーとの調査結果確認（Phase 3.5）を実施したか**
-- [ ] **（リポジトリ分析モード）機能マップがユーザーに確認済みか**
-- [ ] **（リポジトリ分析モード）機能比較マトリクスに根拠データがあるか**
-- [ ] **（リポジトリ分析モード）ロードマップの優先度に論理的根拠があるか**
-
-## 中間報告とユーザーとの対話ポイント
-
-1. **Phase 1 完了時**: 調査設計を提示 → Deep SearchをMCP経由で自動実行
-2. **Phase 2 完了時**: 収集情報を共有、追加調査の指示を受ける
-3. **★ Phase 3.5**: 調査結果をユーザーと確認。正確性の検証。追加の切り口の発見
-4. **Phase 5 完了時**: 最終提案を提示
-
-**Phase 4〜5 に進む前にPhase 3.5を必ず実施する。提案に飛ぶ前に事実を固める。**
-
----
+- [ ] 未取得データに理由が明記されているか
+- [ ] ユーザーとの調査結果確認（Phase 3.5）を実施したか
+- [ ] **各Phaseでチャットによる説明を行ったか**
+- [ ] （Phase D実施時）Codexによる設計検証を実施したか
+- [ ] （Phase I実施時）IssueがDev Ready状態か（着手に必要な情報が全て記載されているか）
 
 ## 出力の原則
 
-### レポートの構造（★最重要）
+### レポートの構造
 
-**レポートは「読んだ相手がそれだけで、書き手のやりたいこと・進めたいことが明確にわかり、何をするべきかすぐわかる」構造にする。**
+1. **サマリー（5行以内）** — 結論 + 根拠の要点 + リファレンスリンク
+2. **結論と根拠（表形式）** — 各結論に「なぜそう言えるか」のデータとリンクを併記
+3. **詳細データ** — 各事例の詳細、生データ
 
-1. **サマリー（5行以内）** — 結論 + 根拠の要点 + リファレンスリンク。これだけ読めば判断できる
-2. **結論と根拠（表形式）** — 各結論に対して「なぜそう言えるか」のデータとリファレンスリンクを併記
-3. **詳細データ（必要な人だけ読む）** — 各事例の詳細、生データ、検索方法
+### ルール
+- 全ての結論・主張にリファレンスリンクを併記（表の中にリンクを入れる）
+- 表形式を優先。横幅が大きい場合はファイル出力
+- 未取得データには理由を明記（「—」を使わない）
+- 図はMermaid記法を使用（GitHub Markdown対応、トークン効率が散文の3-6倍）
 
-**やってはいけないこと:** 結論が文書の後半にしかない / リンクが結論から離れている / 上から全部読まないとわからない / 論理の飛躍がある
+## 出力先
 
-**具体的なルール:**
-- **全ての結論・主張にリファレンスリンクを併記する**
-- **表の中にリンクを入れる**（別セクションにソース一覧をまとめない）
-- **1つの段落で1つの主張**。複数の主張を混ぜない
-- **「〜のため」「〜の結果」等の接続を省略しない**。論理の接続を明示する
-
-### データ出力のルール
-
-- **表形式を優先する**: 比較データは必ず表で出力。横幅が大きくなる場合は複数の表に分割
-- **ファイル出力を併用する**: ターミナルで崩れる表はファイルに書き出す
-- **「—」を使わない**: 未取得データには理由を明記する（API制約、403エラー、検索ヒットなし等）
-- **数値は再検証する**: 重要な数値はソースに戻って再確認。可能ならユーザーにもクロスチェックを依頼
+`workspace/{テーマ名}/` に保存:
+- `repo-analysis.md` — リポジトリ分析結果（リポジトリ分析モード）
+- `research.md` — 収集情報一覧（ソース付き）
+- `analysis.md` — 深掘り分析
+- `proposal.md` — 最終提案
+- `design.md` — 詳細設計（Phase D実施時）
