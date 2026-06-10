@@ -22,14 +22,6 @@
       "type": "http",
       "url": "https://superpowers.social/mcp"
     },
-    "google-news-trends": {
-      "type": "stdio",
-      "command": "uvx",
-      "args": [
-        "google-news-trends-mcp@latest"
-      ],
-      "env": {}
-    },
     "notion": {
       "type": "http",
       "url": "https://mcp.notion.com/mcp"
