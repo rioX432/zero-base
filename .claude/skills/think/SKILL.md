@@ -7,7 +7,8 @@ when_to_use: |
   creating dev-ready GitHub issues from research findings
 argument-hint: "[テーマ・依頼内容（リポジトリURLを含む場合はリポジトリ分析モードで実行）]"
 disable-model-invocation: true
-allowed-tools: Read, Write, Glob, Grep, Agent, WebSearch, WebFetch, AskUserQuestion, mcp__claude_ai_Notion__notion-fetch, mcp__claude_ai_Notion__notion-search, mcp__gemini-deepsearch__deep_search, mcp__perplexity-web__perplexity_search, mcp__perplexity-web__perplexity_ask, mcp__chatgpt__chatgpt_send_and_get_response, mcp__social-superpowers__*, mcp__grok__*, mcp__codex__codex, mcp__codex__codex-reply, mcp__github__create_issue, mcp__github__add_issue_comment, mcp__github__list_issues, effort: max
+allowed-tools: Read, Write, Glob, Grep, Agent, WebSearch, WebFetch, AskUserQuestion, mcp__claude_ai_Notion__notion-fetch, mcp__claude_ai_Notion__notion-search, mcp__gemini-deepsearch__deep_search, mcp__perplexity-web__perplexity_search, mcp__perplexity-web__perplexity_ask, mcp__chatgpt__chatgpt_send_and_get_response, mcp__social-superpowers__*, mcp__grok__*, mcp__codex__codex, mcp__codex__codex-reply, mcp__github__create_issue, mcp__github__add_issue_comment, mcp__github__list_issues
+effort: max
 ---
 
 # /think — ゼロベース思考オーケストレータ
@@ -17,6 +18,7 @@ allowed-tools: Read, Write, Glob, Grep, Agent, WebSearch, WebFetch, AskUserQuest
 テンプレートは `${CLAUDE_SKILL_DIR}/references/` を参照:
 - `references/templates.md` — リサーチ・提案テンプレート
 - `references/design-templates.md` — 設計・Issue テンプレート
+- `references/thinking-frameworks.md` — 思考フレームワーク定義
 
 ## モード判定
 
@@ -74,6 +76,21 @@ Phase 5: Proposal（提案 + 反論検証）
 
 `$ARGUMENTS` から What/Why/Who/Output/Constraints を特定。曖昧な場合はAskUserQuestionで確認（1回、最大3問）。テーマをMECEに調査軸へ分解。
 
+### 1.1a 思考フレームワーク選択
+
+テーマの性質に応じて `references/thinking-frameworks.md` から**1-2個**を選択する。Phase 4（Synthesis）でこのフレームワークのレンズを通して分析する。
+
+| テーマの性質 | 推奨フレームワーク |
+|------------|-----------------|
+| 技術選定・アーキテクチャ設計 | First Principles |
+| リスク分析・戦略判断 | Inversion |
+| プラットフォーム選定・事業判断 | Second-Order Effects |
+| 市場調査・ユーザー行動分析 | Hypothesis-Driven |
+| 組織・エコシステム分析 | Systems Thinking |
+| プロジェクト計画・大きな意思決定 | Pre-mortem |
+
+選択したフレームワークをチャットでユーザーに共有する（「今回はFirst PrinciplesとInversionの視点で分析します」等）。
+
 ### 1.2 並列情報収集（MCP経由・自動）
 
 **全てを同時に並列実行する**（Layer間に依存関係なし）:
@@ -109,9 +126,10 @@ mcp__grok__search_posts(query="{キーワード}")
 2. **クロスバリデーション**: 複数ソース一致 → 高、単一ソース → 中、矛盾 → WebSearchで追加確認
 3. **補完調査**: `deep-researcher` agent で不足情報を補完
 4. **ソース検証**: `source-verifier` agent で全URL検証（Deep SearchのURLは捏造可能性あり）
-5. 統合して `workspace/{テーマ名}/research.md` に保存
+5. **Gap識別**: 調査軸ごとに「不足している情報」を明示的にリストアップ → Phase 3の入力にする
+6. 統合して `workspace/{テーマ名}/research.md` に保存（Gap リストを含む）
 
-**→ チャットで収集結果を共有。**
+**→ チャットで収集結果 + 不足情報リストを共有。**
 
 ---
 
@@ -139,8 +157,18 @@ mcp__grok__search_posts(query="{キーワード}")
 
 **メインAgent（自分）が実行。Sub-Agentに委譲しない。**
 
+### 4.1 フレームワーク適用
+
+Phase 1.1a で選択した思考フレームワークのレンズを通して分析する。`references/thinking-frameworks.md` の該当フレームワークの出力形式に従う。
+
+### 4.2 本質の抽出
+
 通常モード: 共通パターン・差別化要因・失敗パターン・前提条件を抽出 → 本質を1〜3文で定義。
 リポジトリ分析モード: 機能比較マトリクス + ポジショニング分析 + 本質特定。
+
+### 4.3 品質ループバック
+
+Phase 4 の分析中に**重大な情報ギャップ**が発見された場合（フレームワーク適用で「この情報がないと結論が出せない」と判明した場合）、Phase 2-3 に戻って追加調査を行う。Phase 5 に進む前にギャップを埋める。
 
 ---
 
@@ -234,6 +262,15 @@ Issue作成が必要な場合 → Phase I へ。
 
 ---
 
+## Anti-Patterns（明示的に禁止する行為）
+
+- **URLを発明しない**: 存在を確認できないURLを引用に使わない。source-verifierで検証する
+- **counter-argumentをスキップしない**: 時間がなくても必ず実行する
+- **ユーザー提供データで自己主張を循環検証しない**: 外部ソースで裏取りする
+- **「0件」を安易に結論しない**: 複数手法でクロスチェックしてから結論する
+- **前提を検証せず受け入れない**: Phase 1.1aで選択したフレームワークで前提を問い直す
+- **情報ギャップを無視してPhase 5に進まない**: Phase 4.3のループバックを実行する
+
 ## 品質チェック（最終確認）
 
 - [ ] 全事実主張にURL付きソースがあるか
@@ -241,6 +278,8 @@ Issue作成が必要な場合 → Phase I へ。
 - [ ] 推測と事実が区別されているか
 - [ ] counter-argument の反論検証を通過しているか
 - [ ] 未取得データに理由が明記されているか
+- [ ] Phase 1.1aで選択した思考フレームワークをPhase 4で適用したか
+- [ ] Phase 2のGap識別で挙げた不足情報がPhase 3で解消されたか
 - [ ] ユーザーとの調査結果確認（Phase 3.5）を実施したか
 - [ ] **各Phaseでチャットによる説明を行ったか**
 - [ ] （Phase D実施時）Codexによる設計検証を実施したか
