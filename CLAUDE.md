@@ -26,28 +26,32 @@
 ```
 /think テーマ
   │
+  Phase 0.5: Recall（workspace/INDEX.md を grep）
+  │  └─ ★結論はrecallしない。ソースURL+失敗クエリのみ再利用
+  │
   Phase 1: Scoping + 並列情報収集
-  │  ├─ 調査設計
-  │  ├─ Deep Search（Gemini + ChatGPT + Perplexity）
+  │  ├─ 調査設計 + 思考フレームワーク選択
+  │  ├─ Deep Search（Gemini + ChatGPT + perplexity-web）
   │  ├─ SNSリアルタイム（social-superpowers）
   │  └─ Grok X Search（APIキー設定時）
   │
-  Phase 2: Research（結果統合 + 補完調査）
-  │  ├─ Deep Search + SNS結果のクロスバリデーション
-  │  ├─ deep-researcher で補完（Phase 1で不足した情報）
-  │  └─ source-verifier で全URL検証
+  Phase 2: Research + claim検証
+  │  ├─ クロスバリデーション + deep-researcher で補完
+  │  └─ source-verifier: ルールベース抽出→CoVe方式→cross-model独立検証
+  │       （grounded hallucination/論争を検出、残存不確実性を併記）
   │
-  Phase 3: Deep Dive（深掘り分析）
-  │  ├─ case-analyzer × N（並列）
-  │  ├─ social-scanner（反響調査）
-  │  └─ 必要時: 追加Deep SearchをMCP経由で自動実行
+  Phase 3: Deep Dive（case-analyzer × N 並列 / social-scanner）
   │
   Phase 3.5: ★ ユーザーとの調査結果確認
   │
-  Phase 4: Synthesis（本質の特定）← メインAgentが実行
+  Phase 4: Synthesis（本質の特定）← メインAgent
+  │  └─ cross-model 合意（一致=本質 / 相違=不確実と明記。同一モデルN回はしない）
   │
-  Phase 5: Proposal（提案 + 反論検証）
-  │    └─ counter-argument で検証
+  Phase 5: Proposal（提案 + 反論検証 + 品質ゲート）
+  │  ├─ counter-argument（自己採点で的外れ除外）→ 反論を反映し改訂
+  │  ├─ judge: ルーブリック採点（順序入替2回・棄権許容）
+  │  │    └─ <0.7×2回 → ★rio確認（人間が最終検証者・ループ上限2回）
+  │  └─ INDEX.md に追記（結論はrecall対象外の規律）
   │
   ├─ 終了（リサーチのみ）
   └─ → Phase D: 詳細設計（Codex必須連携）
@@ -158,8 +162,13 @@ Issue本文に含める情報:
 - 全事実主張にURL付きソース
 - 提案は2案以上（比較可能）
 - 各提案にメリット・デメリット・リスク
-- source-verifier でURL実在確認済み
-- counter-argument で反論検証済み
+- **source-verifier で claim検証済み**（ルールベース抽出→CoVe方式→cross-model独立検証）
+- **grounded hallucination（NOT_ALIGNED）・cross-model不一致を洗い出し済み**
+- **「検証済み」に残存不確実性を併記**（過信防止）
+- **Synthesisを cross-model で合意形成**（1サンプル確定でない）
+- counter-argument で反論検証済み（自己採点で的外れ除外）
+- **judge 品質ゲート通過**（<0.7×2回なら人間確認・最終検証者は人間）
+- **INDEX.md に追記**（結論はrecall対象にしない規律を遵守）
 - 論理チェーン（事実→推論→結論）が第三者に説明可能
 - **各Phaseでチャットによる説明を実施**
 - **（Phase D実施時）Codexによる設計検証済み**

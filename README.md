@@ -2,7 +2,19 @@
 
 Claude Code project for zero-base research, analysis, and proposals. Supports the full pipeline from research to technical design (with Codex) to Dev Ready Issue creation.
 
-`/think [topic]` triggers a multi-phase pipeline: scoping, thinking framework selection, deep search, cross-validation, case analysis, synthesis, and counter-argument verification. All claims require URL-sourced evidence.
+`/think [topic]` runs a multi-phase pipeline — scoping, thinking-framework selection, parallel deep search, **claim-level verification**, synthesis, and counter-argument — engineered to **minimize the non-determinism and hallucination of LLM reasoning**. All claims require URL-sourced evidence.
+
+## Anti-Hallucination by Design
+
+LLM reasoning is non-deterministic and quietly wrong some of the time; no model gets this to zero. This harness layers verification on top, following 5 principles (see `.claude/skills/think/references/verification.md`):
+
+1. **Rule-based claim extraction** — what gets verified (numbers, proper nouns, assertions) is selected mechanically, never by the LLM's own "this seems important" judgment.
+2. **Cross-model verification** — important claims and the final synthesis are re-checked by a *different* model (Gemini / ChatGPT / Codex). Majority-voting the *same* model N times is treated as false independence and is not used.
+3. **Human as final verifier** — verification loops have a hard cap; when the quality `judge` scores < 0.7 twice, it escalates to you instead of looping.
+4. **No conclusion recall** — past conclusions are never recalled as fact (anchoring poison). Only verified source URLs and dead-end queries are reused, via `workspace/INDEX.md`.
+5. **Residual uncertainty is always shown** — a "verified" label never appears without the remaining risk beside it, to prevent overconfidence.
+
+> These choices are grounded in primary research (Anthropic context-engineering & multi-agent system, Cognition "Don't Build Multi-Agents", CoVe / Self-Consistency papers, LLM-as-judge position-bias study) and were stress-tested by the harness's own counter-argument agent. See `workspace/think-harness-modernization/`.
 
 ## Setup
 
@@ -14,61 +26,38 @@ Claude Code project for zero-base research, analysis, and proposals. Supports th
 
 ### MCP Servers
 
-This project requires **3 Deep Search MCPs** (user-level) and **supplementary MCPs** (project-level).
+This project uses **Deep Search MCPs** (user-level) and **supplementary MCPs** (project-level).
 
-#### Deep Search MCPs (user-level)
+#### Deep Search MCPs
 
-These power the core research pipeline. Install via `claude mcp add` or your preferred method:
-
-| MCP | Tool | Cost |
-|-----|------|------|
-| `gemini-deepsearch` | `mcp__gemini-deepsearch__deep_search` | Free (250/day) |
-| `chatgpt` | `mcp__chatgpt__chatgpt_send_and_get_response` | ChatGPT Plus subscription (250/month deep research) |
-| `perplexity-web` | `mcp__perplexity-web__perplexity_ask` | Sonar $1/$1/MTok, Pro $3/$15/MTok |
-
-Pipeline: **Gemini + ChatGPT** run in parallel on all axes → **Perplexity** for cross-validation on critical axes only (~3/topic).
-
-#### Optional user-level MCPs
+These power the core research pipeline and double as independent **cross-model verifiers**:
 
 | MCP | Tool | Cost |
 |-----|------|------|
-| `grok` | `mcp__grok__search_posts` | $5/1,000 calls. X/Twitter deep search with date/handle filters |
-| `codex` | `mcp__codex__codex` | Codex subscription. Required for Phase D (technical design) |
+| `gemini-deepsearch` | `mcp__gemini-deepsearch__deep_search` | Free (250/day), API-key — no browser |
+| `chatgpt` | `mcp__chatgpt__chatgpt_send_and_get_response` | ChatGPT subscription (browser automation) |
+| `perplexity-web` | `mcp__perplexity-web__perplexity_ask` | Subscription (web version, no API key) |
+| `codex` | `mcp__codex__codex` | Codex subscription — cross-model verifier + Phase D design |
 
-#### Supplementary MCPs (project `.mcp.json`)
+> Note: the API-based Perplexity Sonar MCP (`@perplexity-ai/mcp-server`) is intentionally **not** used — its credits are billed separately from the Pro subscription and it returns 401 once the (now-removed) bundled credit is exhausted. The browser/subscription `perplexity-web` is used instead. Gemini (free, API, browser-free) is the primary deep-search source.
 
-Create `.mcp.json` in the project root (see `.mcp.json.example`):
+Pipeline: **Gemini + ChatGPT** run in parallel on all axes → important claims & the synthesis are **independently re-verified by a different model**.
 
-```json
-{
-  "mcpServers": {
-    "social-superpowers": {
-      "type": "http",
-      "url": "https://superpowers.social/mcp"
-    },
-    "playwright": {
-      "type": "stdio",
-      "command": "npx",
-      "args": ["@playwright/mcp@latest"]
-    },
-    "github": {
-      "type": "stdio",
-      "command": "/bin/sh",
-      "args": ["-c", "GITHUB_PERSONAL_ACCESS_TOKEN=$(gh auth token) npx -y @modelcontextprotocol/server-github"]
-    },
-    "notion": {
-      "type": "http",
-      "url": "https://mcp.notion.com/mcp"
-    }
-  }
-}
-```
+#### Optional / supplementary MCPs
+
+| MCP | Tool | Use |
+|-----|------|-----|
+| `grok` | `mcp__grok__search_posts` | X/Twitter deep search with date/handle filters |
+| `social-superpowers` | `twitter-search` / `reddit-search` | Real-time X + Reddit (HTTP, free) |
+| `github` | `mcp__github__*` | Repo analysis, Issue creation (Phase I) |
+| `notion` | `mcp__notion__*` | Internal context |
+
+Create `.mcp.json` from `.mcp.json.example` in the project root.
 
 ### Verify Setup
 
 ```bash
-claude mcp list
-# Deep Search MCPs + supplementary MCPs should show "Connected"
+claude mcp list   # MCPs should show "Connected"
 ```
 
 ## Usage
@@ -79,16 +68,23 @@ claude mcp list
 
 Runs a multi-phase pipeline:
 
-1. **Scoping** - MECE decomposition + thinking framework selection + Deep Search (Gemini/ChatGPT/Perplexity, auto-executed)
-2. **Research** - Cross-validation + gap identification + supplementary research
-3. **Deep Dive** - Case analysis + social sentiment
-4. **Synthesis** - Apply thinking framework lens + pattern extraction + quality loop-back
-5. **Proposal** - 2+ options with pros/cons + counter-argument verification (Inversion + Pre-mortem)
+0. **Recall** - grep `workspace/INDEX.md` for related past work — reuse *sources and dead-ends only*, never conclusions
+1. **Scoping** - MECE decomposition + thinking-framework selection + parallel Deep Search (auto-executed)
+2. **Research + claim verification** - cross-validation, rule-based claim extraction → CoVe-style source check → cross-model re-verification; gap identification
+3. **Deep Dive** - case analysis + social sentiment
+4. **Synthesis** - thinking-framework lens + **cross-model consensus** (agreement = essence, divergence = flagged uncertain)
+5. **Proposal** - 2+ options with pros/cons → counter-argument (with self-scoring) → **`judge` quality gate** (rubric 0-1, order-swapped twice, human-trigger) → append to `INDEX.md`
+
+Every "verified" output carries its residual uncertainty.
 
 ### Optional follow-on phases
 
 - **Phase D** - Technical design with mandatory Codex cross-validation (Mermaid diagrams)
 - **Phase I** - Dev Ready GitHub Issue creation (requires Phase D completion)
+
+### Periodic baseline measurement
+
+Before major changes, sample ~15 claims from past `workspace/*/research.md` and re-verify them to measure the *actual* error mix (NOT_ALIGNED / PARTIAL-overreach / single-source rate). Drive the design from your own data, not generic hallucination stats. See `references/verification.md` P6.
 
 ### Thinking Frameworks
 
@@ -117,10 +113,11 @@ Results are saved to `workspace/{topic}/`:
 
 | File | Content |
 |------|---------|
-| `research.md` | Collected data with sources + gap list |
+| `research.md` | Collected data with sources + gap list (verified, with residual uncertainty) |
 | `analysis.md` | Deep-dive analysis |
-| `proposal.md` | Final proposals with counter-arguments |
+| `proposal.md` | Final proposals with counter-arguments + judge scores |
 | `design.md` | Technical design with Mermaid diagrams (Phase D) |
+| `workspace/INDEX.md` | Recall index — verified source URLs + failed queries (conclusions are *not* recalled as fact) |
 
 ## Sub-Agents
 
@@ -129,8 +126,9 @@ Results are saved to `workspace/{topic}/`:
 | `deep-researcher` | Web/SNS supplementary research |
 | `case-analyzer` | Individual case deep-dive |
 | `social-scanner` | X/Reddit/Hatena sentiment analysis |
-| `source-verifier` | URL existence + claim alignment check |
-| `counter-argument` | Devil's advocate with Inversion + Pre-mortem |
+| `source-verifier` | Claim verification: rule-based extraction → CoVe-style source check → cross-model independent verification (catches grounded hallucination) |
+| `counter-argument` | Devil's advocate (Inversion + Pre-mortem) with self-scoring to drop weak critiques |
+| `judge` | Rubric quality gate (0-1), order-swapped twice for position-bias, abstention allowed, human-trigger below threshold |
 | `repo-analyzer` | GitHub repo feature/issue/PR extraction |
 
 ## Customization

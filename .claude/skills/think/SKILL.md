@@ -19,6 +19,7 @@ effort: max
 - `references/templates.md` — リサーチ・提案テンプレート
 - `references/design-templates.md` — 設計・Issue テンプレート
 - `references/thinking-frameworks.md` — 思考フレームワーク定義
+- `references/verification.md` — **検証/反ハルシネーションプロトコル（claim検証・cross-model・judge・recall・残存不確実性）**
 
 ## モード判定
 
@@ -31,18 +32,22 @@ effort: max
 ## フロー概要
 
 ```
+事前: Recall（workspace/INDEX.md grep。結論はrecallしない／ソース+失敗クエリのみ）
 Phase 0: Repo Analysis（リポジトリ分析モードのみ）
 Phase 1: Scoping + 並列情報収集
-Phase 2: Research（結果統合 + 補完調査）
+Phase 2: Research + claim検証（ルールベース抽出→CoVe方式→cross-model）
 Phase 3: Deep Dive（深掘り分析）
 Phase 3.5: ★ ユーザーとの調査結果確認
-Phase 4: Synthesis（本質の特定）
-Phase 5: Proposal（提案 + 反論検証）
+Phase 4: Synthesis（本質の特定 + cross-model 合意）
+Phase 5: Proposal（提案 + 反論検証 + judge品質ゲート + INDEX追記）
+  │     └─ <0.7×2回 → ★人間確認（最終検証者は人間）
   ├─ 終了（リサーチのみ）
   └─ → Phase D: 詳細設計（Codex必須連携）
         ├─ 終了（設計のみ）
         └─ → Phase I: Dev Ready Issue作成（設計完了が前提）
 ```
+
+全Phase共通: 「検証済み」には必ず**残存不確実性**を併記する（過信防止）。
 
 ## 報告ルール（★全Phase共通）
 
