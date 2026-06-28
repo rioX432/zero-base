@@ -10,6 +10,7 @@
 4. **ピラミッド原則**: 結論→根拠→データの順で構造化
 5. **Generator-Critic**: 提案後に必ず反論検証（counter-argument agent）
 6. **チャット報告**: 各Phase完了時にファイル保存+チャットで要点を説明。ファイル作成のみで終わらない
+7. **非決定性の抑制**（`references/verification.md`）: ①検証対象は「重要だから」でLLMに選ばせず**ルールベース機械抽出** ②検証は**cross-model**で独立性を作る（同一モデルN回多数決は無効） ③検証の入れ子は**人間（rio）を最終検証者に固定**（無限ループ禁止） ④過去結論はrecallしない（anchoring毒）ソースと失敗クエリのみ ⑤**「検証済み」には残存不確実性を常に併記**（過信防止）
 
 ## Skill
 
@@ -85,7 +86,7 @@ MCP経由で**自動実行**する。Phase 1 で全て同時並列実行。
 |-----|--------|------|
 | `mcp__gemini-deepsearch__deep_search` | 無料（250回/日） | メイン調査 |
 | `mcp__chatgpt__chatgpt_send_and_get_response` | サブスク内（250回/月） | 並列調査・補完 |
-| `mcp__perplexity-web__perplexity_ask` | Sonar $1/$1/MTok, Pro $3/$15/MTok | 重要軸の補完（1テーマ最大3回） |
+| `mcp__perplexity-web__perplexity_ask` | サブスク内（Web版・APIキー不要） | 重要軸の補完（1テーマ最大3回） |
 
 ### SNSリアルタイム（最新情報）
 | MCP | コスト | 用途 |
@@ -103,8 +104,9 @@ MCP経由で**自動実行**する。Phase 1 で全て同時並列実行。
 | `deep-researcher` | Web検索・SNS検索でDeep Search結果を補完。収集者に徹する | sonnet |
 | `case-analyzer` | 個別事例の詳細分析（成果・成功要因・反響） | sonnet |
 | `social-scanner` | X/Reddit/はてブ/connpassでの反響・評判調査 | sonnet |
-| `source-verifier` | 全URLの実在確認 + 主張との整合性チェック | sonnet |
-| `counter-argument` | 提案に対する反論・論理飛躍・リスクの検証 | sonnet |
+| `source-verifier` | claim検証（ルールベース抽出→CoVe方式→cross-model独立検証）。grounded hallucination検出 | sonnet |
+| `counter-argument` | 提案に対する反論・論理飛躍・リスクの検証（自己採点で的外れを除外） | sonnet |
+| `judge` | 成果物をルーブリックで0-1採点する品質ゲート。順序入替2回・棄権許容・人間トリガー | sonnet |
 
 ## 出力先
 
