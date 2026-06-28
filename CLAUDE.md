@@ -164,6 +164,8 @@ Issue本文に含める情報:
 - 各提案にメリット・デメリット・リスク
 - **source-verifier で claim検証済み**（ルールベース抽出→CoVe方式→cross-model独立検証）
 - **grounded hallucination（NOT_ALIGNED）・cross-model不一致を洗い出し済み**
+- **提案の根拠主張は2本以上の独立裏取り**（単一ソースは「裏取り不足」と明示。実測: 単一ソース率93%が最大の弱点）
+- **主張の細部はソース範囲内**（数値/固有名詞/最上級を個別照合。実測: PARTIAL過剰主張33%）
 - **「検証済み」に残存不確実性を併記**（過信防止）
 - **Synthesisを cross-model で合意形成**（1サンプル確定でない）
 - counter-argument で反論検証済み（自己採点で的外れ除外）
