@@ -11,6 +11,7 @@
 5. **Generator-Critic**: 提案後に必ず反論検証（counter-argument agent）
 6. **チャット報告**: 各Phase完了時にファイル保存+チャットで要点を説明。ファイル作成のみで終わらない
 7. **非決定性の抑制**（`references/verification.md`）: ①検証対象は「重要だから」でLLMに選ばせず**ルールベース機械抽出** ②検証は**cross-model**で独立性を作る（同一モデルN回多数決は無効） ③検証の入れ子は**人間（rio）を最終検証者に固定**（無限ループ禁止） ④過去結論はrecallしない（anchoring毒）ソースと失敗クエリのみ ⑤**「検証済み」には残存不確実性を常に併記**（過信防止）
+8. **コスト観のAI再基準化**: 実装難度を理由に**アイディア出し・リサーチ・提案の段階で選択肢を削らない**（LLMのpragmatism/status-quo/anchoringバイアス対策・[ICSE2026](https://arxiv.org/pdf/2601.08045)）。基準線は「rio + AIエージェント（Fable/Codex/Claude Code）で日〜週単位」（build-vs-buyは反転済み・AI製は従来の10–20%コスト・[blink.new](https://blink.new/blog/build-vs-buy-software-2026)）。既存解が無ければ「妥協」でなく**「作る」を既定**とする。**ownership/保守/どう作るかは Phase D（設計）で人間（rio）が舵取りする領域**であり、リサーチ〜提案には**持ち込まない**（[Cheap Prototype, Expensive Maintenance](https://www.vccafe.com/cheap-prototype-expensive-maintenance/) の論点は設計段階で扱う。工数はリサーチ段階の選択の門にしない）
 
 ## Skill
 
@@ -32,6 +33,7 @@
   │  └─ ★結論はrecallしない。ソースURL+失敗クエリのみ再利用
   │
   Phase 1: Scoping（分解・FW選択・モード仮決め）
+  │  ├─ Phase 1.0: ★Ambition pass（理想解を先に描く｜コスト観AI再基準化。工数で選択肢を削らない・無ければ作る既定・ownership/保守はPhaseDへ）
   │  └─ Phase 1.2: ★調査計画の提示と承認（軸/ソース/FW/モード/effort）
   │       └─ rio承認後に収集を走らせる（Gemini collaborative planning 型）
   │  ├─ Deep Search（Gemini + Codex(web_search=live) + perplexity-web、全てブラウザレス）※Understandは絞る（effort scaling）
@@ -51,8 +53,9 @@
   Phase 4: Synthesis（本質の特定）← メインAgent
   │  └─ cross-model 合意（一致=本質 / 相違=不確実と明記。同一モデルN回はしない）
   │
-  Phase 4.5: 発散レーン（Divergence｜方針外OKの面白い脇道）
+  Phase 4.5: 発散レーン（Divergence｜方針外OKの面白い脇道 + Build-the-gap）
   │  ├─ 廃棄プール（未使用情報）+ STORM型 視点選出で根拠ベースに生成
+  │  ├─ ★Build-the-gap: 「既存に無い→作る」案を一級の選択肢として必ず1件立てる（AI速度前提）
   │  └─ judge非適用・provenance付き・★要rio判断（Goしたものだけ深掘り）
   │
   Phase 5: Proposal
@@ -133,6 +136,7 @@ MCP経由で**自動実行**する。Phase 1 で全て同時並列実行。
 ## Phase D: 詳細設計（Codex必須連携）
 
 技術設計（シーケンス、アーキテクチャ、テックスタック選定等）は**必ずCodexと共同で実施**する。
+**ここが ownership/保守/運用コスト/どう作るかを扱う唯一の場所**。リサーチ〜提案で追い出した「作る難度・保守負担」の舵取りは、設計段階で人間（rio）が判断する（build≠own の現実は設計で織り込む）。
 
 1. **Claude起案**: リサーチ結果からアーキテクチャ案 + Mermaid図
 2. **Codex検証（必須）**: `mcp__codex__codex` で設計案を送付し独立検証
@@ -171,7 +175,8 @@ Issue本文に含める情報:
 - **成果物モードを冒頭で宣言**（Understand/Decide/Design/Ship）し終点を越えない
 - **Phase 1.2 で調査計画をrio承認**してから収集（軽い1件を除く）
 - **Phase 5.0 推論トレース**（事実→解釈→論点→選択肢＋却下理由）を提案の前に提示 ＝「いきなり提案」の禁止
-- **（Decide以上）Phase 4.5 発散レーン**をprovenance付きで提示（judge非適用・要rio判断）
+- **（Decide以上）Phase 4.5 発散レーン**をprovenance付きで提示（judge非適用・要rio判断）。**Build-the-gap（既存に無い→作る案）を一級の選択肢として提示**
+- **コスト観をAI速度に再基準化**（実装難度でリサーチ〜提案の選択肢を削らない・既存に無ければ作るを既定・ownership/保守はPhase Dで人間が舵取り）
 - **ブラウザ取得は階層化**（WebFetch既定→Claude in Chromeはメインagent限定→Playwright不使用）
 - 全事実主張にURL付きソース
 - 提案は2案以上（比較可能）
