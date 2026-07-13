@@ -1,136 +1,163 @@
 # Zero-Base Thinking
 
-Claude Code project for zero-base research, analysis, and proposals. Supports the full pipeline from research to technical design (with Codex) to Dev Ready Issue creation.
+ゼロベース思考でリサーチ・分析・提案を行う Claude Code プロジェクト。リサーチ → 技術設計（Codex連携） → Dev Ready Issue作成までを一気通貫で扱う。
 
-`/think [topic]` runs a multi-phase pipeline — scoping, thinking-framework selection, parallel deep search, **claim-level verification**, synthesis, and counter-argument — engineered to **minimize the non-determinism and hallucination of LLM reasoning**. All claims require URL-sourced evidence.
+`/think [テーマ]` が多段パイプライン（スコーピング、思考フレームワーク選択、並列 Deep Search、**claim単位の検証**、本質抽出、反論検証）を実行する。**LLM推論の非決定性とハルシネーションを抑える**ことを目的に設計されており、全ての事実主張に URL 付きソースを要求する。
 
-## Anti-Hallucination by Design
+## 成果物モード（終点を冒頭で固定）
 
-LLM reasoning is non-deterministic and quietly wrong some of the time; no model gets this to zero. This harness layers verification on top, following 5 principles (see `.claude/skills/think/references/verification.md`):
+「調査したら必ず提案・設計まで進む」を禁止する。テーマ受領時に**終点を宣言**し、`Phase 1.2` の計画承認で確定させる。宣言した終点より先へ勝手に進まない。
 
-1. **Rule-based claim extraction** — what gets verified (numbers, proper nouns, assertions) is selected mechanically, never by the LLM's own "this seems important" judgment.
-2. **Cross-model verification** — important claims and the final synthesis are re-checked by a *different* model (Gemini / ChatGPT / Codex). Majority-voting the *same* model N times is treated as false independence and is not used.
-3. **Human as final verifier** — verification loops have a hard cap; when the quality `judge` scores < 0.7 twice, it escalates to you instead of looping.
-4. **No conclusion recall** — past conclusions are never recalled as fact (anchoring poison). Only verified source URLs and dead-end queries are reused, via `workspace/INDEX.md`.
-5. **Residual uncertainty is always shown** — a "verified" label never appears without the remaining risk beside it, to prevent overconfidence.
+| モード | 終点 | 収集の広さ |
+|--------|------|-----------|
+| **Understand（理解）** | Phase 4 + 推論トレース | 絞る（Gemini + ChatGPT 中心） |
+| **Decide（意思決定）** | Phase 5（提案 + judge） | 全ソース並列 |
+| **Design（設計）** | Phase D（Codex設計） | 全ソース並列 |
+| **Ship（実装準備）** | Phase I（Dev Ready Issue） | 全ソース並列 |
 
-> These choices are grounded in primary research (Anthropic context-engineering & multi-agent system, Cognition "Don't Build Multi-Agents", CoVe / Self-Consistency papers, LLM-as-judge position-bias study) and were stress-tested by the harness's own counter-argument agent. See `workspace/think-harness-modernization/`.
+迷ったら Understand を既定にし、「Decide以上に上げますか?」と1問確認する（過剰調査の回避。マルチエージェントは約15xトークン）。
 
-## Setup
+## ハルシネーション抑制の設計
 
-### Prerequisites
+LLM推論は非決定的で、一定確率で静かに誤る。ゼロにできるモデルは存在しない。本ハーネスはその上に検証層を重ねる。5原則（`.claude/skills/think/references/verification.md`）:
+
+1. **ルールベースの claim 抽出** — 検証対象（数値・固有名詞・断定）は機械的に選ぶ。LLMの「重要そう」判断で選ばせない。
+2. **cross-model 検証** — 重要claimと最終的な本質抽出は*異なるモデル*（Gemini / ChatGPT / Codex）で再確認する。*同一*モデルをN回多数決するのは偽の独立性として扱い、使わない。
+3. **人間を最終検証者に固定** — 検証ループには上限がある。品質 `judge` が < 0.7 を2回付けたら、ループさせず人間（rio）に上げる。
+4. **結論をrecallしない** — 過去の結論を事実として再利用しない（anchoring毒）。`workspace/INDEX.md` からは検証済みソースURLと行き止まりクエリのみを再利用する。
+5. **残存不確実性を常に併記** — 「検証済み」ラベルは、残るリスクを隣に書かずには出さない（過信防止）。
+
+> これらの選択は一次調査（Anthropic のコンテキストエンジニアリング & multi-agent system、Cognition "Don't Build Multi-Agents"、CoVe / Self-Consistency 論文、LLM-as-judge の位置バイアス研究）に基づき、ハーネス自身の counter-argument agent でストレステスト済み。2026-07 の第2次改善では GPT Researcher / STORM・Co-STORM / Anthropic multi-agent / Gemini・Perplexity Deep Research を実調査し、設計を裏取りした。詳細は `workspace/think-harness-modernization/` と `workspace/think-harness-redesign/`。
+
+## セットアップ
+
+### 前提
 
 - [Claude Code](https://docs.anthropic.com/en/docs/claude-code)
-- [GitHub CLI](https://cli.github.com/) (`gh auth login`)
-- Node.js (for MCP servers)
+- [GitHub CLI](https://cli.github.com/)（`gh auth login`）
+- Node.js（MCPサーバー用）
+- （任意）[Claude in Chrome 拡張](https://docs.anthropic.com/en/docs/claude-code) — ログイン必須ページの取得に使う
 
-### MCP Servers
+### MCPサーバー
 
-This project uses **Deep Search MCPs** (user-level) and **supplementary MCPs** (project-level).
+**Deep Search MCP**（ユーザーレベル）と**補完MCP**（プロジェクトレベル）を使う。
 
-#### Deep Search MCPs
+#### Deep Search MCP
 
-These power the core research pipeline and double as independent **cross-model verifiers**:
+コアのリサーチパイプラインを駆動し、独立した **cross-model 検証者**も兼ねる:
 
-| MCP | Tool | Cost |
+| MCP | ツール | コスト |
 |-----|------|------|
-| `gemini-deepsearch` | `mcp__gemini-deepsearch__deep_search` | Free (250/day), API-key — no browser |
-| `chatgpt` | `mcp__chatgpt__chatgpt_send_and_get_response` | ChatGPT subscription (browser automation) |
-| `perplexity-web` | `mcp__perplexity-web__perplexity_ask` | Subscription (web version, no API key) |
-| `codex` | `mcp__codex__codex` | Codex subscription — cross-model verifier + Phase D design |
+| `gemini-deepsearch` | `mcp__gemini-deepsearch__deep_search` | 無料（250回/日）・APIキー・ブラウザ不要 |
+| `chatgpt` | `mcp__chatgpt__chatgpt_send_and_get_response` | ChatGPTサブスク（ブラウザ自動操作） |
+| `perplexity-web` | `mcp__perplexity-web__perplexity_ask` | サブスク（Web版・APIキー不要） |
+| `codex` | `mcp__codex__codex` | Codexサブスク — cross-model検証者 + Phase D設計 |
 
-> Note: the API-based Perplexity Sonar MCP (`@perplexity-ai/mcp-server`) is intentionally **not** used — its credits are billed separately from the Pro subscription and it returns 401 once the (now-removed) bundled credit is exhausted. The browser/subscription `perplexity-web` is used instead. Gemini (free, API, browser-free) is the primary deep-search source.
+> 補足: API版 Perplexity Sonar MCP（`@perplexity-ai/mcp-server`）は**意図的に不使用**。クレジットが Pro サブスクと別会計で、バンドルクレジット枯渇後は 401 を返すため。ブラウザ/サブスクの `perplexity-web` を使う。Gemini（無料・API・ブラウザ不要）を主力の Deep Search ソースにする。
 
-Pipeline: **Gemini + ChatGPT** run in parallel on all axes → important claims & the synthesis are **independently re-verified by a different model**.
+パイプライン: **Gemini + ChatGPT** を全軸で並列実行 → 重要claimと本質抽出は**異なるモデルで独立再検証**。
 
-#### Optional / supplementary MCPs
+#### 任意・補完MCP
 
-| MCP | Tool | Use |
+| MCP | ツール | 用途 |
 |-----|------|-----|
-| `grok` | `mcp__grok__search_posts` | X/Twitter deep search with date/handle filters |
-| `social-superpowers` | `twitter-search` / `reddit-search` | Real-time X + Reddit (HTTP, free) |
-| `github` | `mcp__github__*` | Repo analysis, Issue creation (Phase I) |
-| `notion` | `mcp__notion__*` | Internal context |
+| `grok` | `mcp__grok__search_posts` | X/Twitter 深掘り検索（日付・ハンドルフィルタ可） |
+| `social-superpowers` | `twitter-search` / `reddit-search` | X + Reddit リアルタイム（HTTP・無料） |
+| `claude-in-chrome` | `mcp__claude-in-chrome__*` | ログイン壁/JS重ページの取得（実ブラウザセッション・**メインagent限定**・ヘッドレス起動なし） |
+| `github` | `mcp__github__*` | リポジトリ分析、Issue作成（Phase I） |
+| `notion` | `mcp__notion__*` | 社内コンテキスト |
 
-Create `.mcp.json` from `.mcp.json.example` in the project root.
+プロジェクトルートで `.mcp.json.example` から `.mcp.json` を作成する。
 
-### Verify Setup
+### ブラウザ取得の方針
+
+ヘッドレスブラウザの自動起動は行わない。取得は次の順:
+
+1. **既定 = WebFetch / 検索API**（大半はここで足りる）
+2. **ログイン壁・JS重・403 のページのみ = Claude in Chrome**（実ログイン済みセッション。メインagentのみ実行。サブエージェントは `NEEDS_BROWSER` として返し、メインagentが取得する）
+3. **Playwright は使わない**
+
+### セットアップ確認
 
 ```bash
-claude mcp list   # MCPs should show "Connected"
+claude mcp list   # MCP が "Connected" と表示されること
 ```
 
-## Usage
+## 使い方
 
 ```
-/think [topic]
+/think [テーマ]
 ```
 
-Runs a multi-phase pipeline:
+多段パイプラインを実行する:
 
-0. **Recall** - grep `workspace/INDEX.md` for related past work — reuse *sources and dead-ends only*, never conclusions
-1. **Scoping** - MECE decomposition + thinking-framework selection + parallel Deep Search (auto-executed)
-2. **Research + claim verification** - cross-validation, rule-based claim extraction → CoVe-style source check → cross-model re-verification; gap identification
-3. **Deep Dive** - case analysis + social sentiment
-4. **Synthesis** - thinking-framework lens + **cross-model consensus** (agreement = essence, divergence = flagged uncertain)
-5. **Proposal** - 2+ options with pros/cons → counter-argument (with self-scoring) → **`judge` quality gate** (rubric 0-1, order-swapped twice, human-trigger) → append to `INDEX.md`
+0. **Recall** — `workspace/INDEX.md` を grep して関連する過去作業を探す。再利用するのは*ソースと行き止まりのみ*、結論は使わない
+1. **Scoping** — MECE分解 + 思考フレームワーク選択 + 成果物モード仮決め
+   - **1.2 ★調査計画の承認ゲート** — 収集を走らせる前に、軸/ソース/FW/モードを提示して承認を取る（手戻りを着手前に潰す）
+2. **Research + claim検証** — クロスバリデーション、ルールベース claim 抽出 → CoVe方式のソース突合 → cross-model 再検証、Gap識別
+3. **Deep Dive** — 事例分析 + 反響調査
+4. **Synthesis** — 思考フレームワークのレンズ + **cross-model 合意**（一致=本質、相違=不確実と明記）
+5. **提案**
+   - **4.5 発散レーン** — 方針外OKの面白い脇道を根拠ベースで生成（judge非適用・provenance付き・要rio判断。Goしたものだけ深掘り）
+   - **5.0 ★推論トレース** — 提案の前に「事実 → 解釈 → 論点 → 選択肢 ＋ 却下理由」の決定ログを必ず提示（いきなり提案を禁止）
+   - 2案以上をメリデメ付きで → counter-argument（自己採点）→ **`judge` 品質ゲート**（ルーブリック0-1・順序入替2回・人間トリガー）→ `INDEX.md` に追記
 
-Every "verified" output carries its residual uncertainty.
+全ての「検証済み」出力は残存不確実性を併記する。
 
-### Optional follow-on phases
+### 任意の後続Phase
 
-- **Phase D** - Technical design with mandatory Codex cross-validation (Mermaid diagrams)
-- **Phase I** - Dev Ready GitHub Issue creation (requires Phase D completion)
+- **Phase D** — Codex との必須クロスバリデーションを伴う技術設計（Mermaid図）
+- **Phase I** — Dev Ready GitHub Issue 作成（Phase D 完了が前提）
 
-### Periodic baseline measurement
+### 定期ベースライン計測
 
-Before major changes, sample ~15 claims from past `workspace/*/research.md` and re-verify them to measure the *actual* error mix (NOT_ALIGNED / PARTIAL-overreach / single-source rate). Drive the design from your own data, not generic hallucination stats. See `references/verification.md` P6.
+大きな変更の前に、過去の `workspace/*/research.md` から claim を約15件サンプリングして再検証し、*実際の*誤りの内訳（NOT_ALIGNED / PARTIAL過剰主張 / 単一ソース率）を計測する。汎用のハルシネーション統計でなく、自分のデータで設計を駆動する。`references/verification.md` P6 参照。
 
-### Thinking Frameworks
+### 思考フレームワーク
 
-Phase 1 selects 1-2 frameworks based on the topic:
+Phase 1 でテーマに応じて1-2個を選ぶ:
 
-| Framework | Best for |
-|-----------|----------|
-| First Principles | Tech stack, architecture design |
-| Inversion | Risk analysis, strategy decisions |
-| Second-Order Effects | Platform selection, business decisions |
-| Hypothesis-Driven | Market research, user behavior analysis |
-| Systems Thinking | Organization, ecosystem analysis |
-| Pre-mortem | Project planning, major decisions |
+| フレームワーク | 適する場面 |
+|-----------|------|
+| First Principles | テックスタック、アーキテクチャ設計 |
+| Inversion | リスク分析、戦略判断 |
+| Second-Order Effects | プラットフォーム選定、事業判断 |
+| Hypothesis-Driven | 市場調査、ユーザー行動分析 |
+| Systems Thinking | 組織・エコシステム分析 |
+| Pre-mortem | プロジェクト計画、大きな意思決定 |
 
-### Repository Analysis Mode
+### リポジトリ分析モード
 
 ```
-/think [topic] github.com/owner/repo
+/think [テーマ] github.com/owner/repo
 ```
 
-Adds Phase 0 (repo analysis) and replaces Phase 4 with gap analysis + roadmap proposals.
+Phase 0（リポジトリ分析）を追加し、Phase 4 を Gap Analysis + ロードマップ提案に置き換える。
 
-## Output
+## 出力
 
-Results are saved to `workspace/{topic}/`:
+結果は `workspace/{テーマ名}/` に保存される:
 
-| File | Content |
-|------|---------|
-| `research.md` | Collected data with sources + gap list (verified, with residual uncertainty) |
-| `analysis.md` | Deep-dive analysis |
-| `proposal.md` | Final proposals with counter-arguments + judge scores |
-| `design.md` | Technical design with Mermaid diagrams (Phase D) |
-| `workspace/INDEX.md` | Recall index — verified source URLs + failed queries (conclusions are *not* recalled as fact) |
+| ファイル | 内容 |
+|------|------|
+| `research.md` | 収集データ（ソース付き）+ Gapリスト（検証済み・残存不確実性併記） |
+| `analysis.md` | 深掘り分析 + 発散レーン |
+| `proposal.md` | 推論トレース + 最終提案（反論検証・judgeスコア付き） |
+| `design.md` | 技術設計（Mermaid図・Phase D） |
+| `workspace/INDEX.md` | Recall索引 — 検証済みソースURL + 失敗クエリ（結論は事実として recall しない） |
 
 ## Sub-Agents
 
-| Agent | Role |
+| Agent | 役割 |
 |-------|------|
-| `deep-researcher` | Web/SNS supplementary research |
-| `case-analyzer` | Individual case deep-dive |
-| `social-scanner` | X/Reddit/Hatena sentiment analysis |
-| `source-verifier` | Claim verification: rule-based extraction → CoVe-style source check → cross-model independent verification (catches grounded hallucination) |
-| `counter-argument` | Devil's advocate (Inversion + Pre-mortem) with self-scoring to drop weak critiques |
-| `judge` | Rubric quality gate (0-1), order-swapped twice for position-bias, abstention allowed, human-trigger below threshold |
-| `repo-analyzer` | GitHub repo feature/issue/PR extraction |
+| `deep-researcher` | Web/SNS の補完調査 |
+| `case-analyzer` | 個別事例の深掘り |
+| `social-scanner` | X/Reddit/はてブ の反響調査 |
+| `source-verifier` | claim検証: ルールベース抽出 → CoVe方式のソース突合 → cross-model独立検証（grounded hallucination検出） |
+| `counter-argument` | Devil's advocate（Inversion + Pre-mortem）。自己採点で弱い反論を除外 |
+| `judge` | ルーブリック品質ゲート（0-1）。位置バイアス対策で順序入替2回・棄権許容・閾値未満で人間トリガー |
+| `repo-analyzer` | GitHubリポジトリの機能/Issue/PR抽出 |
 
-## Customization
+## カスタマイズ
 
-Edit `CONTEXT.md` to add your organization's context (team size, constraints, priorities) so proposals are tailored to your situation.
+`CONTEXT.md` に自社のコンテキスト（チーム規模・制約・優先度）を追記すると、提案が自社状況に合わせて調整される。
