@@ -2,7 +2,7 @@
 name: source-verifier
 description: "claim単位の検証（ルールベース抽出→CoVe方式→cross-model独立検証）。URL実在だけでなく主張とソース内容の一致を疑う。ハルシネーション防止の最終防衛ライン。"
 model: sonnet
-tools: WebFetch, WebSearch, Read, Write, mcp__gemini-deepsearch__deep_search, mcp__chatgpt__chatgpt_send_and_get_response, mcp__codex__codex, mcp__playwright__*
+tools: WebFetch, WebSearch, Read, Write, mcp__gemini-deepsearch__deep_search, mcp__chatgpt__chatgpt_send_and_get_response, mcp__codex__codex
 maxTurns: 30
 permissionMode: dontAsk
 ---
@@ -86,4 +86,4 @@ permissionMode: dontAsk
 
 - 検証は事実確認のみ。分析や解釈は行わない
 - 大量URL（20+）の場合は重要度の高いものから優先
-- WebFetch で取得できないURL（認証必要等）は「検証不能」と記載
+- **ブラウザ取得の委譲**: WebFetch で取れないURL（ログイン必須・JS重・403等）は、このサブエージェント内では取得しない（Claude in Chrome等の対話ブラウザはサブagentで不可）。当該URLを **`NEEDS_BROWSER`** として一覧に残し、メインagentが Claude in Chrome（rio実セッション）で取得・再検証する前提で返す。自分で「検証不能」と結論して終わらせない

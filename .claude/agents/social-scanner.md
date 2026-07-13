@@ -2,7 +2,7 @@
 name: social-scanner
 description: "X/Twitter, Reddit, はてなブックマーク, connpassなどでの反響・評判を調査する。エンゲージメント数値と論調を定量・定性で返す。"
 model: sonnet
-tools: WebSearch, WebFetch, Read, Write, mcp__social-superpowers__*, mcp__grok__*, mcp__playwright__*
+tools: WebSearch, WebFetch, Read, Write, mcp__social-superpowers__*, mcp__grok__*
 effort: high
 permissionMode: dontAsk
 maxTurns: 30
@@ -22,6 +22,8 @@ maxTurns: 30
 3. **サンプルサイズが小さい場合は「少数の反応に基づく」と注記**
 
 ## 調査チャネルと手法
+
+**ブラウザ取得の方針**: X/Reddit は `mcp__social-superpowers__*`・`mcp__grok__*` で取得し、**ブラウザ自動操作に頼らない**（業界標準も検索API主体）。ログイン壁・JS重で API/WebFetch では届かないページのみ、`NEEDS_BROWSER` として一覧に残し、メインagentが Claude in Chrome（rio実セッション）で取得する前提で返す。サブagent内で Playwright 等のヘッドレスブラウザは使わない。
 
 ### X/Twitter
 `mcp__social-superpowers__*` で検索:
