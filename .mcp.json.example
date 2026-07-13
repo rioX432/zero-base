@@ -13,11 +13,6 @@
       "command": "npx",
       "args": ["-y", "perplexity-web-api-mcp"]
     },
-    "chatgpt": {
-      "type": "stdio",
-      "command": "bash",
-      "args": ["-c", "cd <PATH_TO>/chatgpt-automation-mcp && uv run chatgpt-mcp"]
-    },
     "social-superpowers": {
       "type": "http",
       "url": "https://superpowers.social/mcp"

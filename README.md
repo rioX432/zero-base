@@ -10,7 +10,7 @@
 
 | モード | 終点 | 収集の広さ |
 |--------|------|-----------|
-| **Understand（理解）** | Phase 4 + 推論トレース | 絞る（Gemini + ChatGPT 中心） |
+| **Understand（理解）** | Phase 4 + 推論トレース | 絞る（Gemini + Codex 中心・ブラウザレス） |
 | **Decide（意思決定）** | Phase 5（提案 + judge） | 全ソース並列 |
 | **Design（設計）** | Phase D（Codex設計） | 全ソース並列 |
 | **Ship（実装準備）** | Phase I（Dev Ready Issue） | 全ソース並列 |
@@ -22,7 +22,7 @@
 LLM推論は非決定的で、一定確率で静かに誤る。ゼロにできるモデルは存在しない。本ハーネスはその上に検証層を重ねる。5原則（`.claude/skills/think/references/verification.md`）:
 
 1. **ルールベースの claim 抽出** — 検証対象（数値・固有名詞・断定）は機械的に選ぶ。LLMの「重要そう」判断で選ばせない。
-2. **cross-model 検証** — 重要claimと最終的な本質抽出は*異なるモデル*（Gemini / ChatGPT / Codex）で再確認する。*同一*モデルをN回多数決するのは偽の独立性として扱い、使わない。
+2. **cross-model 検証** — 重要claimと最終的な本質抽出は*異なるモデル系統*（Gemini / Codex / Grok）で再確認する。*同一*モデルをN回多数決するのは偽の独立性として扱い、使わない。
 3. **人間を最終検証者に固定** — 検証ループには上限がある。品質 `judge` が < 0.7 を2回付けたら、ループさせず人間（rio）に上げる。
 4. **結論をrecallしない** — 過去の結論を事実として再利用しない（anchoring毒）。`workspace/INDEX.md` からは検証済みソースURLと行き止まりクエリのみを再利用する。
 5. **残存不確実性を常に併記** — 「検証済み」ラベルは、残るリスクを隣に書かずには出さない（過信防止）。
@@ -49,13 +49,13 @@ LLM推論は非決定的で、一定確率で静かに誤る。ゼロにでき�
 | MCP | ツール | コスト |
 |-----|------|------|
 | `gemini-deepsearch` | `mcp__gemini-deepsearch__deep_search` | 無料（250回/日）・APIキー・ブラウザ不要 |
-| `chatgpt` | `mcp__chatgpt__chatgpt_send_and_get_response` | ChatGPTサブスク（ブラウザ自動操作） |
-| `perplexity-web` | `mcp__perplexity-web__perplexity_ask` | サブスク（Web版・APIキー不要） |
-| `codex` | `mcp__codex__codex` | Codexサブスク — cross-model検証者 + Phase D設計 |
+| `codex` | `mcp__codex__codex`（`config={"web_search":"live"}`） | Codexサブスク — web検索 + cross-model検証者（OpenAI系・**ブラウザ不要**）+ Phase D設計 |
+| `perplexity-web` | `mcp__perplexity-web__perplexity_ask` | サブスク（Web版・APIキー不要・セッションHTTP） |
 
-> 補足: API版 Perplexity Sonar MCP（`@perplexity-ai/mcp-server`）は**意図的に不使用**。クレジットが Pro サブスクと別会計で、バンドルクレジット枯渇後は 401 を返すため。ブラウザ/サブスクの `perplexity-web` を使う。Gemini（無料・API・ブラウザ不要）を主力の Deep Search ソースにする。
+> 補足1: **ChatGPT web MCP（`chatgpt-automation-mcp`）は使わない** — 呼び出しごとにヘッドレス Chrome を起動するため。OpenAI系モデルでの調査・cross-model は Codex の `web_search=live`（サブスク内・ブラウザレス）が担う。実測で Codex の live 検索がソースURL付きで機能することを確認済み。
+> 補足2: API版 Perplexity Sonar MCP（`@perplexity-ai/mcp-server`）は**意図的に不使用**。クレジットが Pro サブスクと別会計で、バンドルクレジット枯渇後は 401 を返すため。セッションHTTPの `perplexity-web` を使う。Gemini（無料・API・ブラウザ不要）を主力の Deep Search ソースにする。
 
-パイプライン: **Gemini + ChatGPT** を全軸で並列実行 → 重要claimと本質抽出は**異なるモデルで独立再検証**。
+パイプライン: **Gemini + Codex(web_search=live)** を全軸で並列実行（**全てブラウザレス**）→ 重要claimと本質抽出は **Gemini/Codex/Grok の異なるモデル系統で独立再検証**。
 
 #### 任意・補完MCP
 
@@ -75,7 +75,7 @@ LLM推論は非決定的で、一定確率で静かに誤る。ゼロにでき�
 
 1. **既定 = WebFetch / 検索API**（大半はここで足りる）
 2. **ログイン壁・JS重・403 のページのみ = Claude in Chrome**（実ログイン済みセッション。メインagentのみ実行。サブエージェントは `NEEDS_BROWSER` として返し、メインagentが取得する）
-3. **Playwright は使わない**
+3. **Playwright も ChatGPT web MCP も使わない**（どちらもヘッドレスブラウザを立てる。OpenAI系は Codex `web_search=live` でブラウザレス）
 
 ### セットアップ確認
 

@@ -34,7 +34,7 @@
   Phase 1: Scoping（分解・FW選択・モード仮決め）
   │  └─ Phase 1.2: ★調査計画の提示と承認（軸/ソース/FW/モード/effort）
   │       └─ rio承認後に収集を走らせる（Gemini collaborative planning 型）
-  │  ├─ Deep Search（Gemini + ChatGPT + perplexity-web）※Understandは絞る（effort scaling）
+  │  ├─ Deep Search（Gemini + Codex(web_search=live) + perplexity-web、全てブラウザレス）※Understandは絞る（effort scaling）
   │  ├─ SNSリアルタイム（social-superpowers）
   │  └─ Grok X Search（APIキー設定時）
   │
@@ -98,7 +98,7 @@ MCP経由で**自動実行**する。Phase 1 で全て同時並列実行。
 | MCP | コスト | 用途 |
 |-----|--------|------|
 | `mcp__gemini-deepsearch__deep_search` | 無料（250回/日） | メイン調査 |
-| `mcp__chatgpt__chatgpt_send_and_get_response` | サブスク内（250回/月） | 並列調査・補完 |
+| `mcp__codex__codex`（`config={"web_search":"live"}`） | サブスク内 | 並列調査・補完 + cross-model（OpenAI系・ブラウザレス。ChatGPT web MCPの代替） |
 | `mcp__perplexity-web__perplexity_ask` | サブスク内（Web版・APIキー不要） | 重要軸の補完（1テーマ最大3回） |
 
 ### SNSリアルタイム（最新情報）
@@ -107,7 +107,7 @@ MCP経由で**自動実行**する。Phase 1 で全て同時並列実行。
 | `mcp__social-superpowers__twitter-search` | 無料 | X/Twitter + Reddit リアルタイム検索 |
 | `mcp__grok__search_posts` | $5/1,000回 | X特化の深い検索（日付・ハンドルフィルタ可） |
 
-コスト管理: Gemini + ChatGPT + social-superpowers で全軸並列実行（無料枠/サブスク内） → Perplexityは最重要軸のみ、Grokは必要時のみ
+コスト管理: Gemini + Codex + social-superpowers で全軸並列実行（無料枠/サブスク内・ブラウザレス） → Perplexityは最重要軸のみ、Grokは必要時のみ
 
 ## Sub-Agents
 

@@ -7,7 +7,7 @@ when_to_use: |
   creating dev-ready GitHub issues from research findings
 argument-hint: "[テーマ・依頼内容（リポジトリURLを含む場合はリポジトリ分析モードで実行）]"
 disable-model-invocation: true
-allowed-tools: Read, Write, Glob, Grep, Agent, WebSearch, WebFetch, AskUserQuestion, mcp__claude_ai_Notion__notion-fetch, mcp__claude_ai_Notion__notion-search, mcp__gemini-deepsearch__deep_search, mcp__perplexity-web__perplexity_search, mcp__perplexity-web__perplexity_ask, mcp__chatgpt__chatgpt_send_and_get_response, mcp__social-superpowers__*, mcp__grok__*, mcp__codex__codex, mcp__codex__codex-reply, mcp__claude-in-chrome__*, mcp__github__create_issue, mcp__github__add_issue_comment, mcp__github__list_issues
+allowed-tools: Read, Write, Glob, Grep, Agent, WebSearch, WebFetch, AskUserQuestion, mcp__claude_ai_Notion__notion-fetch, mcp__claude_ai_Notion__notion-search, mcp__gemini-deepsearch__deep_search, mcp__perplexity-web__perplexity_search, mcp__perplexity-web__perplexity_ask, mcp__social-superpowers__*, mcp__grok__*, mcp__codex__codex, mcp__codex__codex-reply, mcp__claude-in-chrome__*, mcp__github__create_issue, mcp__github__add_issue_comment, mcp__github__list_issues
 effort: max
 ---
 
@@ -36,7 +36,7 @@ effort: max
 
 | モード | 終点 | Phase 1 収集の広さ（effort scaling） | 発散4.5 | 提案/judge |
 |--------|------|-----------------------------------|---------|-----------|
-| **Understand（理解）** | Phase 4 + 推論トレース | 絞る（Gemini + ChatGPT。SNS/Grok/Perplexityは要時のみ） | 任意（面白ければ提示） | なし（本質と論点整理まで） |
+| **Understand（理解）** | Phase 4 + 推論トレース | 絞る（Gemini + Codex(web検索)。SNS/Grok/Perplexityは要時のみ） | 任意（面白ければ提示） | なし（本質と論点整理まで） |
 | **Decide（意思決定）** | Phase 5 | 全ソース並列 | あり | 2案 + judge |
 | **Design（設計）** | Phase D | 全ソース並列 | あり | 2案 + judge + Codex設計 |
 | **Ship（実装準備）** | Phase I | 全ソース並列 | あり | + Dev Ready Issue |
@@ -124,7 +124,7 @@ Phase 5: Proposal
 
 提示する内容（簡潔な表1枚）:
 - **調査軸**（MECE分解の結果）
-- 各軸に**使うソース**（Gemini/ChatGPT/Perplexity/SNS/Grok のどれを回すか）
+- 各軸に**使うソース**（Gemini/Codex/Perplexity/SNS/Grok のどれを回すか。全てブラウザレス）
 - **思考フレームワーク**（1.1aの選択）
 - **成果物モード**（1.1の仮決め）と**終点**
 - **effort**（並列ソース数・deep-researcher並列数の見積り）
@@ -136,14 +136,16 @@ Phase 5: Proposal
 
 承認された計画に従い、**モードのeffort scalingに応じた広さで**並列実行する（Layer間に依存関係なし）:
 
-- **Understand**: Layer 1 を Gemini + ChatGPT に絞る（SNS/Grok/Perplexity は「この軸に本当に要る」場合のみ）。単純テーマに全ソース総動員しない（Anthropic effort scaling: 単純タスクへの過剰並列はトークンの無駄）。
+- **Understand**: Layer 1 を Gemini + Codex に絞る（SNS/Grok/Perplexity は「この軸に本当に要る」場合のみ）。単純テーマに全ソース総動員しない（Anthropic effort scaling: 単純タスクへの過剰並列はトークンの無駄）。
 - **Decide / Design / Ship**: 下記 Layer 1-3 を全軸並列。
 
-**Layer 1: Deep Search**
+**★調査経路はブラウザレス**: ヘッドレスブラウザを立てる ChatGPT web MCP は使わない。OpenAI系モデルでの調査・cross-model は **Codex（`web_search=live`）** が担う（サブスク内・ブラウザ不要。実測で live 検索が機能することを確認済み）。
+
+**Layer 1: Deep Search（全てブラウザレス）**
 ```
 mcp__gemini-deepsearch__deep_search(query="{調査クエリ}", effort="high")
-mcp__chatgpt__chatgpt_send_and_get_response(message="Search the web: {調査クエリ}. Include source URLs.")
-mcp__perplexity-web__perplexity_ask(query="{調査クエリ}")  # 最重要軸のみ
+mcp__codex__codex(prompt="Use live web search: {調査クエリ}. Cite a source URL for every claim. If web search is unavailable, say so instead of answering from memory.", config={"web_search": "live"}, sandbox="read-only", approval-policy="never")
+mcp__perplexity-web__perplexity_ask(query="{調査クエリ}")  # 最重要軸のみ（セッションHTTP・ブラウザレス）
 ```
 
 **Layer 2: SNSリアルタイム**
@@ -158,7 +160,7 @@ mcp__grok__search_posts(query="{キーワード}")
 ```
 
 #### コスト管理
-- **Gemini + ChatGPT + social-superpowers で全軸並列**（無料枠/サブスク内）
+- **Gemini + Codex + social-superpowers で全軸並列**（無料枠/サブスク内・ブラウザレス）
 - Perplexity: Web版（perplexity-web・サブスク利用/APIキー不要、最重要軸のみ、1テーマ最大3回）。API版(@perplexity-ai/mcp-server)はサブスクと別会計のため不使用
 - Grok: $5/1,000回（重要なX情報がある軸のみ）
 
@@ -170,7 +172,7 @@ mcp__grok__search_posts(query="{キーワード}")
 
 ヘッドレスブラウザ（Playwright等）の自動起動をやめ、以下の順で取得する（業界標準も検索API + URL fetch 主体。常設ブラウザ自動操作は例外）:
 
-1. **既定 = WebFetch / 検索API**（Gemini・ChatGPT・Perplexity・social-superpowers・grok）。取得の大半はここで足りる。
+1. **既定 = WebFetch / 検索API**（Gemini・Codex(web_search=live)・Perplexity・social-superpowers・grok）。全てブラウザレス。取得の大半はここで足りる。
 2. **ログイン壁・JS重・403 のページのみ = Claude in Chrome**（`mcp__claude-in-chrome__*`。rio の実ログイン済みセッションを使う。別プロセスのヘッドレス起動が不要）。**メインagent（自分）だけが実行**する — 対話認証MCPはサブagent（source-verifier/social-scanner）では使えないため、サブagentは当該URLを `NEEDS_BROWSER` として返し、メインagentが取得・再投入する。
 3. **Playwright は使わない**（撤去済み）。
 
@@ -184,7 +186,7 @@ Claude in Chrome 利用時は複数ブラウザが接続され得るので、初
 4. **claim検証**: `source-verifier` agent で検証（`references/verification.md` P1-P2）。
    - **ルールベースで claim を機械抽出**（数値/固有名詞/断定）。「重要だから」でLLMに選ばせない。
    - URL実在だけでなく**主張を伏せてソース内容を先に要約→突合**（grounded hallucination検出）。
-   - 提案根拠になる重要claim・数値は **cross-model**（Gemini/ChatGPT/Codex）で独立再検証。不一致は「論争あり」と明記。
+   - 提案根拠になる重要claim・数値は **cross-model**（Gemini/Codex/Grok の異なるモデル系統）で独立再検証。不一致は「論争あり」と明記。
    - **裏取り本数の必須化**（実測で単一ソース率93%が最大の弱点）: 提案の根拠主張は**単一ソース禁止・最低2本の独立裏取り**。取れなければ「裏取り不足」と明示し主柱にしない。
    - **scope check**（実測でPARTIAL過剰主張33%）: 主張の細部（数値/固有名詞/最上級）がソースに**個別に明記されているか**を1つずつ照合。超過分は削るか別ソースで裏取り。
 5. **Gap識別**: 調査軸ごとに「不足している情報」を明示的にリストアップ → Phase 3の入力にする
@@ -229,7 +231,7 @@ Phase 1.1a で選択した思考フレームワークのレンズを通して分
 
 **非決定性対策（`references/verification.md` P3）**: 本質抽出を1サンプルで確定しない。
 1. メインAgent(Claude)が本質案を出す。
-2. **異なるモデル**（Gemini/ChatGPT/Codex のいずれか）に同じ材料で本質を出させる。
+2. **異なるモデル**（Gemini/Codex/Grok のいずれか。ブラウザレス）に同じ材料で本質を出させる。
 3. **一致点＝本質**として採用、**相違点＝「不確実」と明記**。
 4. 同一モデルでN回回すのは独立性が偽物なので**しない**（cross-modelで独立性を作る）。
 
@@ -391,7 +393,8 @@ Issue作成が必要な場合 → Phase I へ。
 - **いきなり提案を出さない**: Phase 5.0 の推論トレース（事実→解釈→論点→選択肢＋却下理由）を提案の前に必ず提示する
 - **発散案（Phase 4.5）を judge/counter-argument で殺さない**: 収束ゲートは提案本体にのみ適用。発散は「要rio判断」で残す
 - **発散を思いつきでやらない**: 廃棄プール（収集したが未使用の情報）と根拠ベースの視点選出から出す
-- **ヘッドレスブラウザを自動起動しない**: WebFetch/検索API を既定にし、ログイン壁のみ Claude in Chrome（メインagent）。Playwright は使わない
+- **ヘッドレスブラウザを自動起動しない**: WebFetch/検索API を既定にし、ログイン壁のみ Claude in Chrome（メインagent）。Playwright も ChatGPT web MCP も使わない（OpenAI系は Codex `web_search=live` でブラウザレス）
+- **壊れた/退化した収集結果から synthesis しない**: `deep_search` 等の返り値が空・退化（英数字比率が極端に低い等の破損）していないかを使う前に検査する。破損時は1回リトライ or 別ソース（WebSearch/Codex）へフォールバック。ゴミを黙って結論に流し込まない（実測: Gemini `answer` が英数字81/65,615文字で破損した事例あり）
 
 ## 品質チェック（最終確認）
 

@@ -12,7 +12,7 @@ maxTurns: 30
 
 ## 目的
 
-ユーザーが外部で実行したDeep Search（ChatGPT / Gemini）の結果を補完する。
+メインagentが実行したDeep Search（Gemini / Codex）の結果を補完する。
 Deep Searchが拾わない情報源（SNS、日本ローカル情報、最新情報等）を収集する。
 **情報収集者に徹する。分析・解釈・提案は一切行わない。**
 
