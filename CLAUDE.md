@@ -10,8 +10,9 @@
 4. **ピラミッド原則**: 結論→根拠→データの順で構造化
 5. **Generator-Critic**: 提案後に必ず反論検証（counter-argument agent）
 6. **チャット報告**: 各Phase完了時にファイル保存+チャットで要点を説明。ファイル作成のみで終わらない
-7. **非決定性の抑制**（`references/verification.md`）: ①検証対象は「重要だから」でLLMに選ばせず**ルールベース機械抽出** ②検証は**cross-model**で独立性を作る（同一モデルN回多数決は無効） ③検証の入れ子は**人間（rio）を最終検証者に固定**（無限ループ禁止） ④過去結論はrecallしない（anchoring毒）ソースと失敗クエリのみ ⑤**「検証済み」には残存不確実性を常に併記**（過信防止）
+7. **非決定性の抑制**（`references/verification.md`）: ①検証対象は「重要だから」でLLMに選ばせず**ルールベース機械抽出** ②検証は**cross-model**で独立性を作る（同一モデルN回多数決は無効） ③検証の入れ子は**人間（rio）を最終検証者に固定**（無限ループ禁止） ④過去結論はrecallしない（anchoring毒）ソースと失敗クエリのみ**（＝レイヤーA。ただし「rioの嗜好・文脈」＝レイヤーBはrecall可。原則9参照）** ⑤**「検証済み」には残存不確実性を常に併記**（過信防止）
 8. **コスト観のAI再基準化**: 実装難度を理由に**アイディア出し・リサーチ・提案の段階で選択肢を削らない**（LLMのpragmatism/status-quo/anchoringバイアス対策・[ICSE2026](https://arxiv.org/pdf/2601.08045)）。基準線は「rio + AIエージェント（Fable/Codex/Claude Code）で日〜週単位」（build-vs-buyは反転済み・AI製は従来の10–20%コスト・[blink.new](https://blink.new/blog/build-vs-buy-software-2026)）。既存解が無ければ「妥協」でなく**「作る」を既定**とする。**ownership/保守/どう作るかは Phase D（設計）で人間（rio）が舵取りする領域**であり、リサーチ〜提案には**持ち込まない**（[Cheap Prototype, Expensive Maintenance](https://www.vccafe.com/cheap-prototype-expensive-maintenance/) の論点は設計段階で扱う。工数はリサーチ段階の選択の門にしない）
+9. **知識レイヤーの分離と衛生**（`references/knowledge.md`）: 蓄積するローカル資産を2レイヤーに分ける。**レイヤーA=テーマ事実/結論**（`workspace/INDEX.md`・各テーマ）は原則7④の通り結論recall禁止。**レイヤーB=rioプロファイル**（`knowledge/profile.md`＝関心領域・判断の好み・制約/文脈・地雷）は「人物の安定属性」でありrecall可。ただしBは**「提案の当てはめ・提示形式」専用でテーマの真偽を歪めない**。Bの更新は**マージ&重複排除**（append-only禁止・推測禁止・2回以上観測した傾向のみ）。**workspaceは昇華（INDEX追記）後に`scripts/compact-workspace.sh`でコンパクション**し、無限肥大を防ぐ（アーカイブ・最終成果物は消さない）
 
 ## Skill
 
@@ -29,8 +30,8 @@
   │
   ★成果物モードを冒頭で宣言（Understand/Decide/Design/Ship）＝終点を固定。越えて進まない
   │
-  Phase 0.5: Recall（workspace/INDEX.md を grep）
-  │  └─ ★結論はrecallしない。ソースURL+失敗クエリのみ再利用
+  Phase 0.5: Recall（レイヤーA: workspace/INDEX.md を grep ＋ レイヤーB: knowledge/profile.md を読む）
+  │  └─ ★A=結論はrecallしない（ソースURL+失敗クエリのみ）／ B=rio嗜好・文脈はrecall可（当てはめ・提示用。真偽は歪めない）
   │
   Phase 1: Scoping（分解・FW選択・モード仮決め）
   │  ├─ Phase 1.0: ★Ambition pass（理想解を先に描く｜コスト観AI再基準化。工数で選択肢を削らない・無ければ作る既定・ownership/保守はPhaseDへ）
@@ -63,7 +64,7 @@
   │  ├─ counter-argument（自己採点で的外れ除外）→ 反論を反映し改訂
   │  ├─ judge: ルーブリック採点（順序入替2回・棄権許容）
   │  │    └─ <0.7×2回 → ★rio確認（人間が最終検証者・ループ上限2回）
-  │  └─ INDEX.md に追記（結論はrecall対象外の規律）
+  │  └─ INDEX.md 追記（レイヤーA・結論はrecall対象外）＋ profile.md マージ更新（レイヤーB・新属性があれば）
   │
   ├─ ［Understand］終了（本質+推論トレースまで。提案なし）
   ├─ ［Decide］終了（提案まで）
@@ -126,12 +127,18 @@ MCP経由で**自動実行**する。Phase 1 で全て同時並列実行。
 
 ## 出力先
 
-`workspace/{テーマ名}/` に保存:
+**レイヤーA（テーマ事実・`workspace/{テーマ名}/` に保存）:**
 - `repo-analysis.md` — リポジトリ分析結果・機能マップ（リポジトリ分析モード）
 - `research.md` — 収集情報一覧（ソース付き）
 - `analysis.md` — 深掘り分析
 - `proposal.md` — 最終提案・ロードマップ
 - `design.md` — 詳細設計・Mermaid図（Phase D実施時）
+- `workspace/INDEX.md` — Recall索引（検証済ソースURL+失敗クエリ。結論はrecallしない）
+
+**レイヤーB（テーマ横断の個人知識・`workspace/` の外）:**
+- `knowledge/profile.md` — rioプロファイル（関心領域・判断の好み・制約/文脈・地雷）。gitignore・会話ローカル限定。初期テンプレは `.claude/skills/think/references/profile-template.md`
+
+**肥大の抑制:** `scripts/compact-workspace.sh`（既定dry-run・`--apply`で実行）。規律の詳細は `.claude/skills/think/references/knowledge.md`。
 
 ## Phase D: 詳細設計（Codex必須連携）
 
@@ -157,6 +164,14 @@ Issue本文に含める情報:
 ## 自社コンテキスト
 
 提案に自社状況を反映する場合 → `CONTEXT.md` に記載。
+
+## 知識レイヤー / workspace 衛生（原則9）
+
+蓄積するローカル資産（gitignore・会話ローカル限定）を整理された状態に保つ。詳細規律は `.claude/skills/think/references/knowledge.md`。
+
+- **レイヤーA=テーマ事実**（`workspace/INDEX.md`・各テーマ）: 結論はrecall禁止（anchoring毒）。ソースURL+失敗クエリのみ再利用。
+- **レイヤーB=rioプロファイル**（`knowledge/profile.md`）: 関心領域・判断の好み・制約/文脈・地雷。recall可だが**提案の当てはめ・提示形式専用**（テーマの真偽を歪めない）。更新はマージ&重複排除（append-only/推測/1発言決めつけ禁止）。初期化は `references/profile-template.md` を `knowledge/profile.md` にコピー。
+- **workspaceライフサイクル**: 1テーマ＝最終成果物＋INDEX1行を live に残し、raw中間物は昇華後に `scripts/compact-workspace.sh`（既定dry-run・N日でアーカイブ）で剪定。`_archive/` と成果物は消さない。
 
 ## MCP（補完調査ツール）
 
@@ -189,7 +204,9 @@ Issue本文に含める情報:
 - **Synthesisを cross-model で合意形成**（1サンプル確定でない）
 - counter-argument で反論検証済み（自己採点で的外れ除外）
 - **judge 品質ゲート通過**（<0.7×2回なら人間確認・最終検証者は人間）
-- **INDEX.md に追記**（結論はrecall対象にしない規律を遵守）
+- **INDEX.md に追記**（レイヤーA・結論はrecall対象にしない規律を遵守）
+- **新属性があれば `knowledge/profile.md` をマージ更新**（レイヤーB・推測禁止・重複排除。テーマの結論を歪めない）
+- **workspaceは昇華後にコンパクション**（`scripts/compact-workspace.sh`・肥大の抑制・アーカイブと成果物は保持）
 - 論理チェーン（事実→推論→結論）が第三者に説明可能
 - **各Phaseでチャットによる説明を実施**
 - **（Phase D実施時）Codexによる設計検証済み**
