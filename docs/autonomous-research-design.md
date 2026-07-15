@@ -4,11 +4,22 @@
 >
 > **成果物モード = Design**（アーキテクチャ + 段階ロードマップまで。実装は各Phaseで rio 承認後）。
 
-## TL;DR
+## 採用方針（2026-07-15 rio確定）: zero-base を頭にする
 
-- 理想像は **既存の [`rioX432/personal-ai-secretary`](https://github.com/rioX432/personal-ai-secretary) が ~80% 実装済み**（cron収集・スコアリング・LINE双方向・mem0・週次/月次・**新トピック提案まで**）。チャット基盤は **LINE で決着済み**（Telegram新規ビルドは不要）。
-- **zero-base(/think) の価値 = 「深さと厳密さ」**。secretary の軽量スコアリング/提案を、検証付きの深いリサーチに引き上げる「深堀りの脳」。
-- **本当にやるべきは greenfield ビルドではなく (A) 2システムの統合 と (B) 重複の解消**。後者は rio がこのセッション冒頭で挙げた「趣味嗜好・知識が未整理・重複」問題そのもの——それが**2リポジトリにまたがって顕在化**している。
+**前提の更新（重要）**: secretary の現状出力は **rio 評価で「全然有用でない」**（Gemini flash が RSS 見出しを浅くスコアするだけ・AI話題に限定）。よって **secretary を土台に育てる方針は棄却**。
+
+- **リサーチの頭 = zero-base /think**（検証付き・多ソース・source-verifier・judge）。**有用な深掘りを自動で届ける**のが統合の狙い。
+- **secretary からは「使える配管」だけ再利用**（cron・チャット配信・重複除外メモリ・候補ソース収集）。**弱い頭（Gemini scoring/proposal）は使わない**。
+- **チャットは LINE 継続 or Telegram 移行どちらも可**（rio: Telegramが優れているならそちらでOK）。v1はコスト最小で選ぶ。
+- 冒頭の「未整理・重複」問題は残るが、**頭を zero-base に一本化**することで嗜好/メモリの正本も zero-base 側（profile.md / INDEX）に寄せやすくなる（下記 §3 の整流は「zero-base を正」に単純化）。
+
+> 以下 §1–§8 は secretary の実体調査と prior art に基づく分析。**採用アーキテクチャは本節（zero-base as brain）が最新**で、§4 の2層図はその具体形。
+
+## TL;DR（更新後）
+
+- **zero-base(/think) を頭**に、secretary の**使える配管だけ**再利用して、**有用な深掘りリサーチを自動でチャット配信**する。
+- secretary の弱いスコアリング/提案は捨てる。理想像の「面白い発見」「整合性チェック」は zero-base の novelty厳密化 + repo-analyzer で作る。
+- v1 = 「自動で1本、検証付きの深掘りがチャットに届く」最小ループ（下記 §9）。
 
 ---
 
@@ -140,3 +151,47 @@ flowchart TD
 - Novelty: https://arxiv.org/abs/2606.04743 (TIDE) / https://arxiv.org/abs/2507.00310 (AutoDiscovery) / https://arxiv.org/pdf/2604.17609 (Agents Explore but Ignore)
 - profile駆動digest: https://github.com/AutoLLM/ArxivDigest
 - 暴走/コスト制御: https://www.nexgismo.com/blog/ai-agent-budget-guards-stop-runaway-api-costs
+
+---
+
+## 9. v1 ビルド計画（zero-base as brain・最小ループ）
+
+**ゴール**: 指示なしで **1日1本、検証付きの深掘りリサーチがチャットに届く**。「有用な自動リサーチ」を最小で実証する。
+
+### 日次フロー
+```mermaid
+flowchart LR
+    T[cron トリガー<br/>1日1回] --> R[profile.md + interests.yaml<br/>+ INDEX.md を読む]
+    R --> P[次に深掘る1テーマを選ぶ<br/>興味優先 × INDEX差分でnovelty]
+    P --> TH[/think 実行<br/>Understand/Decide-light・検証付き/]
+    TH --> F[結論先出しで整形<br/>+ソース +残存不確実性]
+    F --> C[チャットへ push]
+    TH --> I[INDEX.md に1行追記<br/>次回novelty基準]
+```
+
+### 再利用 vs 新規（zero-base as brain）
+| 要素 | 方針 | 出所 |
+|---|---|---|
+| スケジューラ | **再利用/新規どちらも可**。この基盤の Routine(cron) が最小（新規インフラ不要） | Routines or secretary GitHub Actions |
+| 収集（候補ソース） | 再利用可（RSS/HN/GHT を「調査候補の入口」に。頭は zero-base） | secretary `tools/` |
+| **リサーチの頭** | **zero-base /think に置換**（secretary の Gemini scoring は使わない） | zero-base |
+| 話題taxonomy | interests.yaml を参照（複製しない） | secretary `data/interests.yaml` |
+| 判断/提示の好み | profile.md | zero-base |
+| 直近＝既知の記憶 | INDEX.md（novelty基準）。mem0 sent-urls も重複除外に流用可 | zero-base / secretary |
+| チャット配信 | **v1: LINE 再利用が最速**（token既存）。Telegram希望なら bot token 差替 | secretary LINE or 新Telegram |
+
+### v1 の未決・rio 依存
+- **チャット基盤**: LINE 再利用（最速・token既存） か Telegram 新規（技術的に優・bot作成要）。→ 要選択。
+- **push の認証情報**: LINE/Telegram の token は rio の secret。エージェントセッションからの push に必要（token 用意は rio）。
+- **runtime**: Routine(この基盤) を既定。GitHub Actions + Claude Code CLI でも可（secretary と同居できる）。
+
+### コスト/安全（v1から入れる）
+- 1日1本・**Understand 既定**（フル /think の15xトークンは rio 指示時のみ）。
+- 頻度上限（cron 回数）＋ 1回あたりの effort 上限＝財務サーキットブレーカー。
+- v1は**Notify型**（報告のみ・不可逆操作なし）。承認ゲートは v2 で。
+
+### v2 以降
+- チャット reaction → profile.md 更新候補（feedback loop）
+- novelty厳密化（INDEX/mem0 機械的差分＋serendipity3条件）
+- 実装×計画 drift check（repo-analyzer・逸脱をチャット警告）
+- proactivityレベル（Observer→Partner）＋承認ゲート＋1日3回化
