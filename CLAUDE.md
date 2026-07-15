@@ -171,7 +171,8 @@ Issue本文に含める情報:
 
 - **レイヤーA=テーマ事実**（`workspace/INDEX.md`・各テーマ）: 結論はrecall禁止（anchoring毒）。ソースURL+失敗クエリのみ再利用。
 - **レイヤーB=rioプロファイル**（`knowledge/profile.md`）: 関心領域・判断の好み・制約/文脈・地雷。recall可だが**提案の当てはめ・提示形式専用**（テーマの真偽を歪めない）。更新はマージ&重複排除（append-only/推測/1発言決めつけ禁止）。初期化は `references/profile-template.md` を `knowledge/profile.md` にコピー。
-- **workspaceライフサイクル**: 1テーマ＝最終成果物＋INDEX1行を live に残し、raw中間物は昇華後に `scripts/compact-workspace.sh`（既定dry-run・N日でアーカイブ）で剪定。`_archive/` と成果物は消さない。
+- **サイズバジェット（Anthropic準拠・G1）**: `profile.md` は 200行/25KB 目安（超過はマージで簡潔化）。`INDEX.md` はエントリ上限（既定150）。根拠は「MEMORY.md先頭200行/25KBのみロード・CLAUDE.md 200行超でadherence低下」（[Claude Code memory](https://code.claude.com/docs/en/memory)）。
+- **workspaceライフサイクル**: 1テーマ＝最終成果物＋INDEX1行を live に残し、raw中間物は昇華後に `scripts/compact-workspace.sh`（既定dry-run・N日でアーカイブ）で剪定。**INDEX上限超過分は `INDEX-archive.md` へローテーション（削除でなく退避・grep可能）**（G2）。`_archive/` と成果物は消さない。
 
 ## MCP（補完調査ツール）
 

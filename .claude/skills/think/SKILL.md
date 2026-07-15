@@ -84,7 +84,7 @@ Phase 5: Proposal
 
 1. `CLAUDE.md` — 原則確認
 2. `CONTEXT.md` — 自社コンテキスト（存在すれば）
-3. **`workspace/INDEX.md` を recall（レイヤーA=テーマ事実）** — テーマ関連語で `grep`。**結論はrecallしない**（anchoring毒）。再利用するのは「検証済みソースURL」と「失敗クエリ/行き止まり/既知の罠」のみ。過去結論は「前回の仮説（要再検証）」としてのみ扱い、今回ゼロベースで再検証する（詳細: `references/verification.md` P6 / `workspace/INDEX.md` の recall規律）
+3. **`workspace/INDEX.md`（＋あれば `workspace/INDEX-archive.md`）を recall（レイヤーA=テーマ事実）** — テーマ関連語で `grep`。**結論はrecallしない**（anchoring毒）。再利用するのは「検証済みソースURL」と「失敗クエリ/行き止まり/既知の罠」のみ。過去結論は「前回の仮説（要再検証）」としてのみ扱い、今回ゼロベースで再検証する。※INDEX.mdはサイズバジェット（既定150エントリ）超過分が INDEX-archive.md へローテーションされるので、古い件は archive 側も grep する（詳細: `references/verification.md` P6 / `references/knowledge.md`）
 4. **`knowledge/profile.md` を読む（レイヤーB=rioプロファイル）** — 存在すれば読む。関心領域・判断の好み・既知の制約/文脈・地雷。**これは「テーマ結論」ではないので recall してよい**（anchoring毒の対象外）。使うのは「提案の当てはめ」と「提示形式の最適化」だけで、**テーマの真偽の再導出には使わない**。2レイヤー分離の詳細: `references/knowledge.md`。無ければ `references/profile-template.md` から実体化を検討。
 5. `workspace/{近いテーマ}/` — 必要なら本文も参照（レイヤーA同様の規律）
 6. **Notion等の社内情報** — 既存の施策・実績・計画の早期把握

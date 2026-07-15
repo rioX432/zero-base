@@ -56,9 +56,26 @@ profile は「提案の当てはめ」と「提示形式」のためだけに使
 
 昇華が済めば、raw中間物（`research.md` / `analysis.md` / `repo-analysis.md`）は **圧縮アーカイブに退避**してよい。完全には消さない（次回 recall の一次ソースになり得る）が、live な workspace には残さない。
 
-### バジェット（目安）
+### サイズバジェット（Anthropic 準拠）[G1]
+Anthropic は「常時ロードするメモリ」に明確な数値上限を置いている。これに倣う:
+- **Claude Code auto memory**: `MEMORY.md` は**先頭200行/25KBのみ**毎回ロード。超過分はロードされない。
+- **CLAUDE.md**: **200行超で adherence 低下**。詳細はトピックファイルへ分割。
+- **Agent Skills**: `SKILL.md` は5,000トークン未満推奨（progressive disclosure）。
+- 出典: [Claude Code memory](https://code.claude.com/docs/en/memory) / [Agent Skills](https://platform.claude.com/docs/en/agents-and-tools/agent-skills/overview)
+
+**本ハーネスへの適用**:
+- `knowledge/profile.md` は **200行/25KB を目安上限**にする。超えたら**マージ&重複排除で簡潔化**（自動削除はしない＝情報損失防止。`compact-workspace.sh` は警告のみ出す）。
+- `workspace/INDEX.md` は **エントリ数に上限**（既定150件）。超えたら古いエントリを `workspace/INDEX-archive.md` へ退避（下記ローテーション）。
+
+### バジェット（テーマ単位の目安）
 - **1テーマ = 最終成果物 + INDEX 1行** を live に残す。raw は N日（既定30日）経過でアーカイブ。
 - workspace 全体が肥大したら（体感で重い/検索が遅い）コンパクションを実行する。
+
+### INDEX ローテーション [G2]
+`INDEX.md` は1テーマ1行で**無限に増える**（per-theme dir は剪定してもINDEXは残る）。Claude Code の「索引を簡潔に保ち詳細はオンデマンド」に倣い、上限超過分を退避する:
+- `compact-workspace.sh` が `INDEX.md` のエントリ数 > 上限（既定150）を検出すると、**古いエントリ（上＝古い）を `workspace/INDEX-archive.md` へ移動**。`INDEX.md` は最新N件に保つ。
+- **退避であって削除ではない**（Zep の invalidate-not-delete に倣う）。`INDEX-archive.md` も **recall 時に grep 対象**（一次ソースとして生き続ける）。
+- これで「毎回読むINDEXは軽いまま」「過去の失敗クエリ/ソースは grep で辿れる」を両立する。
 
 ### コンパクション手順（ローカルで実行）
 `scripts/compact-workspace.sh` を使う（既定 dry-run・`--apply` で実行）。動作:
