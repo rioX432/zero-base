@@ -20,6 +20,8 @@ effort: max
 - `references/design-templates.md` — 設計・Issue テンプレート
 - `references/thinking-frameworks.md` — 思考フレームワーク定義
 - `references/verification.md` — **検証/反ハルシネーションプロトコル（claim検証・cross-model・judge・recall・残存不確実性）**
+- `references/knowledge.md` — **知識レイヤー（recall 2レイヤー分離・`knowledge/profile.md` 運用）と workspace ライフサイクル（肥大の抑制）**
+- `references/profile-template.md` — `knowledge/profile.md` の初期テンプレート
 
 ## モード判定
 
@@ -82,9 +84,10 @@ Phase 5: Proposal
 
 1. `CLAUDE.md` — 原則確認
 2. `CONTEXT.md` — 自社コンテキスト（存在すれば）
-3. **`workspace/INDEX.md` を recall** — テーマ関連語で `grep`。**結論はrecallしない**（anchoring毒）。再利用するのは「検証済みソースURL」と「失敗クエリ/行き止まり/既知の罠」のみ。過去結論は「前回の仮説（要再検証）」としてのみ扱い、今回ゼロベースで再検証する（詳細: `references/verification.md` P6 / `workspace/INDEX.md` の recall規律）
-4. `workspace/{近いテーマ}/` — 必要なら本文も参照（同上の規律）
-5. **Notion等の社内情報** — 既存の施策・実績・計画の早期把握
+3. **`workspace/INDEX.md`（＋あれば `workspace/INDEX-archive.md`）を recall（レイヤーA=テーマ事実）** — テーマ関連語で `grep`。**結論はrecallしない**（anchoring毒）。再利用するのは「検証済みソースURL」と「失敗クエリ/行き止まり/既知の罠」のみ。過去結論は「前回の仮説（要再検証）」としてのみ扱い、今回ゼロベースで再検証する。※INDEX.mdはサイズバジェット（既定150エントリ）超過分が INDEX-archive.md へローテーションされるので、古い件は archive 側も grep する（詳細: `references/verification.md` P6 / `references/knowledge.md`）
+4. **`knowledge/profile.md` を読む（レイヤーB=rioプロファイル）** — 存在すれば読む。関心領域・判断の好み・既知の制約/文脈・地雷。**これは「テーマ結論」ではないので recall してよい**（anchoring毒の対象外）。使うのは「提案の当てはめ」と「提示形式の最適化」だけで、**テーマの真偽の再導出には使わない**。2レイヤー分離の詳細: `references/knowledge.md`。無ければ `references/profile-template.md` から実体化を検討。
+5. `workspace/{近いテーマ}/` — 必要なら本文も参照（レイヤーA同様の規律）
+6. **Notion等の社内情報** — 既存の施策・実績・計画の早期把握
 
 ---
 
@@ -302,7 +305,8 @@ Phase 4 の分析中に**重大な情報ギャップ**が発見された場合�
    - 順序入替2回採点・棄権許容。
    - **停止条件（人間トリガー）**: 総合<0.7が2回連続 → rioに確認を上げる。ループバック上限2回。**最終検証者は人間**。
 5. `workspace/{テーマ名}/proposal.md` に保存。**「検証済み」「推奨」には残存不確実性を併記**。
-6. **INDEX.md追記**: `workspace/INDEX.md` に1行追記（テーマ/当時の暫定結論(要再検証)/検証済ソースURL/失敗クエリ/既知の罠）。**結論はrecall対象にしない規律を守る**。
+6. **INDEX.md追記（レイヤーA）**: `workspace/INDEX.md` に1行追記（テーマ/当時の暫定結論(要再検証)/検証済ソースURL/失敗クエリ/既知の罠）。**結論はrecall対象にしない規律を守る**。
+7. **profile.md 更新（レイヤーB）**: そのセッションで **新たに判明した rio の安定属性**（判断の好み・恒常的制約・地雷）があれば `knowledge/profile.md` を更新する。**マージ & 重複排除**（append-onlyにしない）・**推測で書かない**・**2回以上観測した傾向のみ記録**（1発言で人格を決めない）。追記でよいのは「更新ログ」節のみ。詳細: `references/knowledge.md`。新属性が無ければ何もしない。
 
 **→ チャットで提案の要点・推奨理由・残存不確実性・judgeスコアを説明。**
 
@@ -397,7 +401,10 @@ Issue作成が必要な場合 → Phase I へ。
 - **情報ギャップを無視してPhase 5に進まない**: Phase 4.3のループバックを実行する
 - **検証対象を「重要だから」でLLMに選ばせない**: ルールベースで機械抽出する（`references/verification.md` P1）
 - **同一モデルのN回多数決を「検証」と呼ばない**: 系統的バイアスが消えない。cross-modelで独立性を作る
-- **過去の結論をrecallして確定事実扱いしない**: anchoring毒。ソースと失敗クエリのみ再利用
+- **過去の結論をrecallして確定事実扱いしない**: anchoring毒。ソースと失敗クエリのみ再利用（レイヤーA）
+- **profile（レイヤーB）でテーマの結論を歪めない**: `knowledge/profile.md` は「提案の当てはめ・提示形式」専用。「rioが好きだから結論もそれ」にしない。テーマの真偽はゼロベースで再導出する
+- **profile を append-only の澱にしない**: 更新はマージ&重複排除。推測で人格を刻まない（2回以上観測した傾向のみ）。rio が直接編集できる前提を壊さない
+- **workspace を昇華前に剪定しない / 昇華済みを放置して肥大させない**: INDEX追記（昇華）を済ませてから raw をアーカイブ。`scripts/compact-workspace.sh`（既定dry-run）で定期コンパクション。アーカイブ（`_archive/`）と最終成果物は消さない
 - **「検証済み」を残存不確実性なしで書かない**: 過信を生む
 - **提案の根拠を単一ソースで主柱にしない**: 最低2本の独立裏取り。取れなければ「裏取り不足」と明示（実測: 単一ソース率93%）
 - **主張の細部をソース範囲を超えて書かない**: 数値・固有名詞・最上級はソースに個別明記を確認（実測: PARTIAL過剰主張33%）
@@ -428,7 +435,8 @@ Issue作成が必要な場合 → Phase I へ。
 - [ ] 「検証済み」に残存不確実性を併記したか
 - [ ] Synthesisを cross-model で合意形成したか（1サンプル確定でないか）
 - [ ] judge 品質ゲートを通過したか（<0.7×2回なら人間確認）
-- [ ] INDEX.md に追記したか（結論はrecall対象にしない規律を守ったか）
+- [ ] INDEX.md に追記したか（結論はrecall対象にしない規律を守ったか｜レイヤーA）
+- [ ] 新たに判明した rio の安定属性があれば `knowledge/profile.md` をマージ更新したか（推測で書かず・重複排除｜レイヤーB）
 - [ ] 推測と事実が区別されているか
 - [ ] counter-argument の反論検証を通過しているか
 - [ ] 未取得データに理由が明記されているか
@@ -461,3 +469,9 @@ Issue作成が必要な場合 → Phase I へ。
 - `analysis.md` — 深掘り分析
 - `proposal.md` — 最終提案
 - `design.md` — 詳細設計（Phase D実施時）
+- `workspace/INDEX.md` — Recall索引（レイヤーA・検証済ソースURL+失敗クエリ。結論は事実としてrecallしない）
+
+テーマ横断の個人知識（レイヤーB）は `workspace/` の外に置く:
+- `knowledge/profile.md` — rioプロファイル（関心領域・判断の好み・制約/文脈・地雷）。gitignore・会話ローカル限定。初期テンプレは `references/profile-template.md`。
+
+workspace の肥大抑制は `scripts/compact-workspace.sh`（既定dry-run・`--apply`で実行）。詳細規律は `references/knowledge.md`。

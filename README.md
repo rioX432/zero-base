@@ -144,7 +144,17 @@ Phase 0（リポジトリ分析）を追加し、Phase 4 を Gap Analysis + ロ�
 | `analysis.md` | 深掘り分析 + 発散レーン |
 | `proposal.md` | 推論トレース + 最終提案（反論検証・judgeスコア付き） |
 | `design.md` | 技術設計（Mermaid図・Phase D） |
-| `workspace/INDEX.md` | Recall索引 — 検証済みソースURL + 失敗クエリ（結論は事実として recall しない） |
+| `workspace/INDEX.md` | Recall索引（レイヤーA）— 検証済みソースURL + 失敗クエリ（結論は事実として recall しない） |
+| `knowledge/profile.md` | rioプロファイル（レイヤーB）— 関心領域・判断の好み・制約/文脈・地雷。テーマ横断で recall 可（提案の当てはめ・提示形式専用）。gitignore・会話ローカル限定 |
+
+### 知識レイヤーと workspace 衛生
+
+蓄積するローカル資産を2レイヤーに分けて整理する（詳細: `.claude/skills/think/references/knowledge.md`）:
+
+- **レイヤーA（テーマ事実・`workspace/`）** — 結論は recall しない（anchoring毒）。ソースと失敗クエリのみ再利用。
+- **レイヤーB（rioプロファイル・`knowledge/profile.md`）** — 「人物の安定属性」なので recall 可。ただし提案の当てはめ・提示形式にだけ使い、テーマの真偽は歪めない。更新はマージ&重複排除（append-only にしない）。
+
+workspace の無限肥大は `scripts/compact-workspace.sh`（既定 dry-run・`--apply` で実行）で抑える。昇華済み（INDEX 追記済み）テーマの raw中間物を N日でアーカイブに退避し、live には最終成果物 + INDEX 1行を残す。アーカイブと成果物は消さない。
 
 ## Sub-Agents
 
