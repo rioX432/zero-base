@@ -13,3 +13,9 @@ knowledge/
 # Claude Code (private per-user)
 .claude/projects/
 .mcp.json
+
+# Secrets（token等・絶対にコミットしない）
+.env
+*.env
+!*.env.example
+scripts/auto-research/.env

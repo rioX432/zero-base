@@ -53,15 +53,47 @@ token/chat_id を設定した状態で:
 ```
 Telegram に「🔎 今日の深掘り: …」が届けば成功。
 
-## 5. 毎日自動化（cron Routine）
+## 5. 毎日自動化（自分のマシンで cron・採用構成）
 
-この基盤の Routine（スケジュールトリガー）で `/auto-research` を毎日起動する。
-- **cron**: 例 `0 22 * * *`（UTC 22:00 = JST 07:00）など好みの時刻。
-- **起動先**: 毎回フレッシュセッション（リポジトリ＋上記環境変数が入っていること）。
-- **プロンプト**: `/auto-research`
+自分の常時起動マシン（PC/VPS/自宅サーバ）で回す。token はこのマシンの `.env` だけに置き、チャットにもGitHubにも出さない。
 
-> Routine の作成はエージェントに「毎朝7時に /auto-research を回す Routine を作って」と頼めば設定できる。
-> **前提**: 環境に `TELEGRAM_BOT_TOKEN` / `TELEGRAM_CHAT_ID` が入っていること（入っていないと自動で送信せず dry-run 相当で止まる）。
+### 5.1 準備（このマシンで一度だけ）
+```bash
+# 1) リポジトリを clone（zero-base）
+git clone <zero-base> && cd zero-base
+
+# 2) Claude Code CLI をインストール＆認証
+#    推奨（サブスク・API課金なし）:
+claude setup-token          # 1年有効トークンを発行 → 出力を控える
+
+# 3) .env を用意
+cp scripts/auto-research/.env.example scripts/auto-research/.env
+#    .env を編集: TELEGRAM_BOT_TOKEN / TELEGRAM_CHAT_ID / CLAUDE_CODE_OAUTH_TOKEN を記入
+#    （.env は gitignore 済み＝コミットされない）
+```
+
+### 5.2 手動テスト
+```bash
+DRY_RUN=1 ./scripts/auto-research/run-local.sh   # 送信せず内容確認
+./scripts/auto-research/run-local.sh             # 実配信（Telegramに届く）
+```
+
+### 5.3 cron 登録（毎朝7時JSTの例）
+`crontab -e` で追記:
+```cron
+# 毎日 07:00 JST に自律リサーチ1本
+0 7 * * *  cd /path/to/zero-base && /usr/local/bin/bash scripts/auto-research/run-local.sh >> /tmp/auto-research.log 2>&1
+```
+
+### 仕組み（run-local.sh）
+`pick-topic`(機械選定) → `claude -p`(Understand・検証付き・**権限プロンプトなし** `--permission-mode dontAsk --allowedTools WebSearch,WebFetch`) → 整形 → `send-telegram` → INDEX追記。
+Claude には**Web取得と読取専用**しか渡さない（送信・書込はシェルが担当＝最小権限）。
+
+> 認証: `.env` に `CLAUDE_CODE_OAUTH_TOKEN`（サブスク）か `ANTHROPIC_API_KEY`（API課金）。前者が月額内で安い。
+> 参考: [Claude Code headless](https://code.claude.com/docs/en/headless) / [authentication](https://code.claude.com/docs/en/authentication)
+
+### （代替）この Claude Code 環境の Routine で回す場合
+常時起動マシンを持たないなら、この基盤の Routine（cron）で `/auto-research` を毎日起動する手もある（token はこの環境のシークレットに設定）。採用構成は上記のローカル cron。
 
 ## コスト/安全（v1）
 
