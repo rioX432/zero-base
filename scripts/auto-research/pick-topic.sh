@@ -25,6 +25,8 @@ RECENT_N="${RECENT_N:-14}"
 # interests.yaml の探索（明示指定 → knowledge/ → secretary クローン → リポ内）
 if [[ -z "$INTERESTS_YAML" ]]; then
   for c in knowledge/interests.yaml \
+           "$HOME/workspace/personal-ai-secretary/data/interests.yaml" \
+           ../personal-ai-secretary/data/interests.yaml \
            /workspace/personal-ai-secretary/data/interests.yaml \
            data/interests.yaml; do
     [[ -f "$c" ]] && { INTERESTS_YAML="$c"; break; }
@@ -68,7 +70,8 @@ recent_index_lc() {
 TOPICS=()
 while IFS= read -r row; do TOPICS+=("$row"); done < <(parse_topics)
 if [[ ${#TOPICS[@]} -eq 0 ]]; then
-  echo "error: interests.yaml の topics: を解析できませんでした（$INTERESTS_YAML）" >&2
+  # ${} 必須: bash 3.2 × UTF-8 では `$VAR）` の全角括弧が変数名に食われる
+  echo "error: interests.yaml の topics: を解析できませんでした（${INTERESTS_YAML}）" >&2
   exit 1
 fi
 

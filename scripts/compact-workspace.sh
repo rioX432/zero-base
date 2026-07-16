@@ -70,6 +70,20 @@ fi
 
 INDEX="workspace/INDEX.md"
 ARCHIVE_DIR="workspace/_archive"
+# INDEX の「実エントリ」= `- [テーマ] (YYYY-MM-DD, workspace/{dir}/) | …` の行だけ。
+# 素の bullet で数えると recall規律ヘッダやフォーマット例まで巻き込む（日付でそれらを除外）。
+ENTRY_RE='^- \[[^]]+\] \([0-9]{4}-[0-9]{2}-[0-9]{2}'
+# INDEX に「そのテーマ自身のエントリ行」があるか。
+# - grep|grep -q のパイプにすると grep -q が先に抜けて上流が SIGPIPE(141) を受け、
+#   pipefail が「該当なし」に化ける（実測: 先頭付近のテーマが常に誤SKIP）→ 単一プロセスで判定。
+# - 正規表現は -v で渡さない（awk が -v 値のエスケープを解釈して \[ が [ に潰れ、regex が壊れる）。
+#   リテラル /…/ で書き、interval {n} は BSD awk 互換のため使わない。
+index_has_theme() {
+  awk -v t="workspace/$1/" '
+    /^- \[[^]]+\] \([0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]/ && index($0, t) { found = 1; exit }
+    END { exit !found }
+  ' "$INDEX"
+}
 RAW_FILES=(research.md analysis.md repo-analysis.md)
 DELIVERABLES=(proposal.md design.md)
 
@@ -113,9 +127,11 @@ for dir in workspace/*/; do
     continue
   fi
 
-  # ガード: INDEX.md にテーマ行が無ければ昇華未完 → スキップ
-  if [[ ! -f "$INDEX" ]] || ! grep -qF "$theme" "$INDEX" 2>/dev/null; then
-    echo "  [SKIP] $theme : INDEX.md に行が無い（昇華未完）。先に INDEX 追記が必要。"
+  # ガード: INDEX.md に「そのテーマ自身のエントリ行」が無ければ昇華未完 → スキップ。
+  # 素の部分一致だと、他テーマのエントリ本文が名前を引用しているだけで昇華済みと誤判定し、
+  # 未昇華の raw を剪定してしまう（実測: 43テーマ中7件が誤判定）。エントリ行 ∧ 自dirパスで判定する。
+  if [[ ! -f "$INDEX" ]] || ! index_has_theme "$theme"; then
+    echo "  [SKIP] $theme : INDEX.md に自身のエントリ行が無い（昇華未完）。先に INDEX 追記が必要。"
     skipped=$(( skipped + 1 ))
     continue
   fi
@@ -158,7 +174,7 @@ done
 
 # ---- (2) INDEX.md ローテーション [G2] ----
 if [[ -f "$INDEX" ]]; then
-  entries=$(grep -c '^[[:space:]]*-' "$INDEX" || true)
+  entries=$(grep -cE "$ENTRY_RE" "$INDEX" || true)
   entries=${entries:-0}
   if [[ "$entries" -gt "$INDEX_MAX" ]]; then
     overflow=$(( entries - INDEX_MAX ))
@@ -167,17 +183,34 @@ if [[ -f "$INDEX" ]]; then
     if [[ $APPLY -eq 1 ]]; then
       ARCH_INDEX="workspace/INDEX-archive.md"
       [[ -f "$ARCH_INDEX" ]] || printf '# INDEX archive（ローテーション退避・grep可能・recall一次ソース。削除ではなく退避）\n\n' > "$ARCH_INDEX"
-      tmp_keep=$(mktemp); tmp_arch=$(mktemp)
-      # bullet(テーマ行)を上から数え、古い overflow 件を archive、残りと非bullet行は keep。順序保持。
-      awk -v ovf="$overflow" -v keep="$tmp_keep" -v arch="$tmp_arch" '
-        /^[[:space:]]*-/ { b++; if (b<=ovf) print >> arch; else print >> keep; next }
-        { print >> keep }
-      ' "$INDEX"
+      tmp_keep=$(mktemp); tmp_arch=$(mktemp); tmp_del=$(mktemp)
+      # 退避対象＝「エントリ行の日付が古い overflow 件」の行番号。
+      # 実INDEXは prepend/append が混在し出現順≠日付順なので（実測: 昇順違反4・降順違反14）、
+      # 位置ではなく日付で選ぶ。ヘッダ・フォーマット例・非エントリ行は常に keep。
+      # head で切らない: sort の出力が pipe buffer を超えると head の早期終了で
+      # sort が SIGPIPE(141) → pipefail + set -e でスクリプトごと死ぬ。awk で全部読んでから絞る。
+      grep -nE "$ENTRY_RE" "$INDEX" \
+        | sed -E 's/^([0-9]+):- \[[^]]+\] \(([0-9]{4}-[0-9]{2}-[0-9]{2}).*/\2 \1/' \
+        | sort -k1,1 | awk -v n="$overflow" 'NR<=n {print $2}' > "$tmp_del"
+      awk -v keep="$tmp_keep" -v arch="$tmp_arch" '
+        NR==FNR { del[$1]=1; next }
+        { if (FNR in del) print >> arch; else print >> keep }
+      ' "$tmp_del" "$INDEX"
       cat "$tmp_arch" >> "$ARCH_INDEX"
       mv "$tmp_keep" "$INDEX"
-      rm -f "$tmp_arch"
+      rm -f "$tmp_arch" "$tmp_del"
       echo "    -> ${overflow} 件を ${ARCH_INDEX} へ移動（INDEX.md は最新 ${INDEX_MAX} 件に）"
     fi
+  fi
+
+  # サイズ警告: エントリ数上限だけではバイト肥大を捕捉できない（1エントリが数KBになるため）
+  # ローテーション後の実数で報告する（退避前の値だと実態とズレる）
+  i_kb=$(du -k "$INDEX" | cut -f1)
+  entries_now=$(grep -cE "$ENTRY_RE" "$INDEX" || true)
+  if [[ "$i_kb" -gt 100 ]]; then
+    echo
+    echo "  [INDEX] ${INDEX} = ${i_kb}KB / ${entries_now:-0} エントリ（1件あたり肥大）"
+    echo "          grep のヒット1行がそのまま context に載る。1エントリを数行に圧縮するか --index-max を下げる検討を"
   fi
 fi
 

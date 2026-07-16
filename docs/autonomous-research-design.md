@@ -127,7 +127,7 @@ flowchart TD
 
 ## 6. 主要設計判断
 
-1. **チャット = LINE で確定**（secretary が実装済み。Telegram新規ビルドは却下）。
+1. ~~**チャット = LINE で確定**（secretary が実装済み。Telegram新規ビルドは却下）。~~ → **撤回（2026-07-15）**: 「zero-base as brain」で secretary を土台にしない方針に変わり、LINE再利用の前提（secretary の配管に乗る）が消えた。**v1 は Telegram を採用**（bot作成5分・push実装が薄い・rio了承済み）。LINE への差し替えは送信スクリプト1本の入替で可能（`send-telegram.sh` 相当を足すだけ）。
 2. **re-build しない**。ambient層は secretary を正とし、zero-base は「深堀りの脳」に徹する（NIH回避・工数はPhase Dで判断）。
 3. **重複は責任分割＋一方向ブリッジ1本**で整流（双方向同期は複雑さで却下）。
 4. **novelty は機械的差分を主**、LLM surprisal は補助（「LLMは意外情報に弱い」[実証](https://arxiv.org/pdf/2604.17609)への対処）。serendipity3条件（関連・新規・意外）で報告を絞る。
@@ -180,10 +180,10 @@ flowchart LR
 | 直近＝既知の記憶 | INDEX.md（novelty基準）。mem0 sent-urls も重複除外に流用可 | zero-base / secretary |
 | チャット配信 | **v1: LINE 再利用が最速**（token既存）。Telegram希望なら bot token 差替 | secretary LINE or 新Telegram |
 
-### v1 の未決・rio 依存
-- **チャット基盤**: LINE 再利用（最速・token既存） か Telegram 新規（技術的に優・bot作成要）。→ 要選択。
-- **push の認証情報**: LINE/Telegram の token は rio の secret。エージェントセッションからの push に必要（token 用意は rio）。
-- **runtime**: Routine(この基盤) を既定。GitHub Actions + Claude Code CLI でも可（secretary と同居できる）。
+### v1 の確定・rio 依存
+- **チャット基盤**: **Telegram で確定**（§6-1 参照。secretary を土台にしない以上 LINE再利用の利点が消えたため）。実装は `scripts/auto-research/send-telegram.sh`。
+- **runtime**: **rio のローカルマシン + cron で確定**（`scripts/auto-research/run-local.sh`）。token はそのマシンの `.env` のみに置く。
+- **残る rio 依存**: bot token / chat_id の発行（`docs/auto-research-setup.md` 手順1）と、`claude setup-token` による無人実行用の認証。
 
 ### コスト/安全（v1から入れる）
 - 1日1本・**Understand 既定**（フル /think の15xトークンは rio 指示時のみ）。

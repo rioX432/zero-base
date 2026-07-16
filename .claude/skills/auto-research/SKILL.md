@@ -7,7 +7,7 @@ when_to_use: |
   human prompt. Not for interactive research — use /think for that.
 argument-hint: "（引数不要。テーマは自動選定。'--dry-run' で送信せず表示）"
 disable-model-invocation: true
-allowed-tools: Read, Write, Bash, Grep, Glob, Skill, WebSearch, WebFetch, mcp__gemini-deepsearch__deep_search, mcp__perplexity-web__perplexity_ask, mcp__codex__codex
+allowed-tools: Read, Edit, Grep, Glob, Bash(scripts/auto-research/*), WebSearch, WebFetch, mcp__gemini-deepsearch__deep_search, mcp__perplexity-web__perplexity_ask, mcp__codex__codex
 effort: medium
 ---
 
@@ -54,17 +54,24 @@ Telegram 向けに簡潔整形（Markdown・~3000字以内）:
 過信を生む書き方をしない（「検証済み」には必ず残存不確実性を併記）。
 
 ### 5. 配信
+本文は**引数で直接渡す**（`printf ... | …` のようにパイプ元を別コマンドにすると、Bash許可が
+`scripts/auto-research/*` に絞ってあるため先頭コマンドが `printf` になり権限で弾かれる）:
 ```bash
-printf '%s' "$整形本文" | scripts/auto-research/send-telegram.sh
-# token未設定 or 引数に --dry-run が来た場合は DRY_RUN=1 で送信せず表示のみ
+scripts/auto-research/send-telegram.sh "<整形済み本文>"
+# token未設定 or 引数に --dry-run が来た場合は DRY_RUN=1 を前置して送信せず表示のみ
+DRY_RUN=1 scripts/auto-research/send-telegram.sh "<整形済み本文>"
 ```
 
 ### 6. 記録（次回のnovelty基準）
-`workspace/INDEX.md` に1行追記（テーマ / 当時の暫定結論(要再検証) / 検証済ソースURL / 失敗クエリ）。**結論はrecall対象にしない規律を守る**。
-INDEX が肥大したら `scripts/compact-workspace.sh`（別途・定期）でローテーション。
+`workspace/INDEX.md` の「## 索引」以下に **Edit で1行追記**する（全体を Write で書き直さない）。**既存INDEXと同じ形式ちょうど**にする（`compact-workspace.sh` の昇華済み判定がこの構造に依存する）:
+```
+- [テーマslug] (YYYY-MM-DD, workspace/テーマslug/) | 当時の暫定結論(要再検証): … | 検証済ソース: url1, url2 | 失敗クエリ/行き止まり: … | 既知の罠: …
+```
+**結論はrecall対象にしない規律を守る**。INDEX が肥大したら `scripts/compact-workspace.sh`（別途・定期）でローテーション。
 
 ## 安全（v1）
 - **Notify型のみ**（報告だけ・不可逆操作なし・承認ゲート不要）。
+- **最小権限**: Bash は `scripts/auto-research/*` のみ（token が環境にあるので任意コマンドは渡さない）。書込は INDEX 追記の Edit だけ。送信は `send-telegram.sh` に閉じる。
 - 1回1テーマ・Understand既定＝コスト上限（財務サーキットブレーカー）。
 - 配信失敗（send-telegram 非ゼロ終了）はログに残し、握り潰さない。
 

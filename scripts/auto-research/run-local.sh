@@ -19,9 +19,28 @@ set -euo pipefail
 cd "$(dirname "$0")/../.."   # repo root
 
 ENV_FILE="scripts/auto-research/.env"
+# source ではなく KEY=VALUE だけを読む（.env は token 置き場であってスクリプトではない。
+# source すると .env に紛れたシェルコードが cron 権限で走る）。
 if [[ -f "$ENV_FILE" ]]; then
-  set -a; # shellcheck disable=SC1090
-  source "$ENV_FILE"; set +a
+  while IFS= read -r env_line || [[ -n "$env_line" ]]; do
+    [[ "$env_line" =~ ^[[:space:]]*# ]] && continue
+    [[ "$env_line" =~ ^[[:space:]]*$ ]] && continue
+    if [[ "$env_line" =~ ^[[:space:]]*(export[[:space:]]+)?([A-Za-z_][A-Za-z0-9_]*)=(.*)$ ]]; then
+      env_key="${BASH_REMATCH[2]}"; env_val="${BASH_REMATCH[3]}"
+      # 引用符があれば中身をそのまま採用（インラインコメントは値の一部にしない）。
+      # 引用符なしは ` #` 以降をコメントとして落とす（token に空白は含まれない）。
+      if [[ "$env_val" =~ ^\"([^\"]*)\" ]]; then
+        env_val="${BASH_REMATCH[1]}"
+      elif [[ "$env_val" =~ ^\'([^\']*)\' ]]; then
+        env_val="${BASH_REMATCH[1]}"
+      else
+        env_val="${env_val%%[[:space:]]#*}"
+        env_val="${env_val#"${env_val%%[![:space:]]*}"}"
+        env_val="${env_val%"${env_val##*[![:space:]]}"}"
+      fi
+      export "$env_key=$env_val"
+    fi
+  done < "$ENV_FILE"
 fi
 
 DRY_RUN="${DRY_RUN:-0}"
@@ -42,7 +61,15 @@ TOPIC="$(awk -F'\t' '{for(i=1;i<=NF;i++) if($i=="TOPIC") print $(i+1)}' <<<"$PIC
 WHY="$(awk -F'\t' '{for(i=1;i<=NF;i++) if($i=="WHY") print $(i+1)}' <<<"$PICK")"
 HINT="$(awk -F'\t' '{for(i=1;i<=NF;i++) if($i=="HINT") print $(i+1)}' <<<"$PICK")"
 [[ -z "$TOPIC" ]] && { log "テーマ選定に失敗: $PICK"; exit 1; }
-log "今日のテーマ: $TOPIC （$WHY）"
+# 変数は必ず ${} で囲む: bash 3.2 × UTF-8ロケールでは `$WHY）` の全角括弧が
+# 変数名の一部として解釈され `unbound variable` で落ちる（cron/手動実行の両方で踏む）。
+log "今日のテーマ: ${TOPIC} （${WHY}）"
+
+# INDEX行は既存INDEX.mdの形式 `- [slug] (YYYY-MM-DD, workspace/slug/) | …` に揃える。
+# compact-workspace.sh の昇華済み判定がこの構造に依存するため、ズレると剪定されない。
+TODAY="$(date +%F)"
+TOPIC_SLUG="$(printf '%s' "$TOPIC" | tr '[:upper:]' '[:lower:]' | tr -cs 'a-z0-9' '-' | sed 's/^-//; s/-$//')"
+[[ -z "$TOPIC_SLUG" ]] && TOPIC_SLUG="auto-research-${TODAY}"
 
 # --- 2-4. Claude で recall→/think(Understand,検証付き)→整形 ---
 read -r -d '' PROMPT <<EOF || true
@@ -57,14 +84,27 @@ read -r -d '' PROMPT <<EOF || true
 出力は次の形式ちょうどにする（他は何も出力しない）:
 <digest本文>
 ---INDEX---
-INDEX_LINE: - <テーマ短縮名> | 暫定: <1文結論(要再検証)> | <検証済ソースURL> | 失敗クエリ:<あれば>
+INDEX_LINE: - [${TOPIC_SLUG}] (${TODAY}, workspace/${TOPIC_SLUG}/) | 当時の暫定結論(要再検証): <1文> | 検証済ソース: <url1, url2> | 失敗クエリ/行き止まり: <あれば> | 既知の罠: <あれば>
 EOF
 
 log "Claude で調査中..."
 MODEL_ARG=(); [[ -n "$CLAUDE_MODEL" ]] && MODEL_ARG=(--model "$CLAUDE_MODEL")
+# stderr は捨てずに残す。無人cronでは認証切れ・レート制限・ツール拒否の原因がここにしか出ない。
+CLAUDE_ERR="$(mktemp)"
+trap 'rm -f "$CLAUDE_ERR"' EXIT
+# ${arr[@]+"${arr[@]}"}: bash 3.2 は set -u 下で空配列の "${arr[@]}" を unbound 扱いにする（4.4で修正）
 # shellcheck disable=SC2086
-OUT="$("$CLAUDE_BIN" -p "$PROMPT" $CLAUDE_ARGS "${MODEL_ARG[@]}" 2>/dev/null)" || { log "claude 実行に失敗（CLI認証/フラグを確認）"; exit 1; }
-[[ -z "${OUT// }" ]] && { log "Claude 出力が空"; exit 1; }
+if ! OUT="$("$CLAUDE_BIN" -p "$PROMPT" $CLAUDE_ARGS ${MODEL_ARG[@]+"${MODEL_ARG[@]}"} 2>"$CLAUDE_ERR")"; then
+  log "claude 実行に失敗（CLI認証/フラグを確認）:"
+  sed 's/^/[auto-research][claude] /' "$CLAUDE_ERR" >&2
+  exit 1
+fi
+if [[ -z "${OUT// }" ]]; then
+  log "Claude 出力が空:"
+  sed 's/^/[auto-research][claude] /' "$CLAUDE_ERR" >&2
+  exit 1
+fi
+[[ -s "$CLAUDE_ERR" ]] && sed 's/^/[auto-research][claude:warn] /' "$CLAUDE_ERR" >&2
 
 # --- digest と INDEX_LINE を分離 ---
 BODY="${OUT%%---INDEX---*}"
@@ -80,11 +120,12 @@ fi
 
 # --- 6. INDEX追記（次回novelty基準） ---
 if [[ -n "$IDX_LINE" ]]; then
-  mkdir -p workspace
-  [[ -f workspace/INDEX.md ]] || printf '# INDEX（Recall索引・結論はrecallしない）\n\n' > workspace/INDEX.md
   if [[ "$DRY_RUN" == "1" ]]; then
-    log "INDEX追記(dry-run): $IDX_LINE"
+    # dry-run は副作用ゼロにする（ディレクトリ/ヘッダも作らない）
+    log "INDEX追記(dry-run): ${IDX_LINE}"
   else
+    mkdir -p workspace
+    [[ -f workspace/INDEX.md ]] || printf '# INDEX（Recall索引・結論はrecallしない）\n\n## 索引\n\n' > workspace/INDEX.md
     printf -- '%s\n' "$IDX_LINE" >> workspace/INDEX.md
     log "INDEX追記: $IDX_LINE"
   fi
