@@ -61,6 +61,13 @@ if [[ ! -d workspace ]]; then
   exit 0
 fi
 
+# BSD(macOS)/GNU stat 両対応（BSD find に -printf は無い）
+if stat -f '%m' . >/dev/null 2>&1; then
+  mtime_of() { stat -f '%m' "$1"; }
+else
+  mtime_of() { stat -c '%Y' "$1"; }
+fi
+
 INDEX="workspace/INDEX.md"
 ARCHIVE_DIR="workspace/_archive"
 RAW_FILES=(research.md analysis.md repo-analysis.md)
@@ -95,8 +102,12 @@ for dir in workspace/*/; do
   fi
 
   # 年齢判定（ディレクトリ内で最も新しい mtime を使う）
-  newest=$(find "$dir" -type f -printf '%T@\n' 2>/dev/null | sort -nr | head -1 | cut -d. -f1)
-  [[ -z "$newest" ]] && continue
+  newest=0
+  while IFS= read -r -d '' f; do
+    m=$(mtime_of "$f")
+    (( m > newest )) && newest=$m
+  done < <(find "$dir" -type f -print0 2>/dev/null)
+  [[ "$newest" -eq 0 ]] && continue
   age=$(( now_epoch - newest ))
   if [[ $age -lt $cutoff ]]; then
     continue
@@ -129,8 +140,12 @@ for dir in workspace/*/; do
       done
     else
       # 成果物なし（Understand止まり等）: 最新1 .md を残し他を削除
-      keep=$(find "$dir" -maxdepth 1 -name '*.md' -type f -printf '%T@ %p\n' 2>/dev/null | sort -nr | head -1 | cut -d' ' -f2-)
-      find "$dir" -maxdepth 1 -name '*.md' -type f ! -path "$keep" -delete 2>/dev/null || true
+      keep=""; keep_m=0
+      while IFS= read -r -d '' f; do
+        m=$(mtime_of "$f")
+        if (( m > keep_m )); then keep_m=$m; keep="$f"; fi
+      done < <(find "$dir" -maxdepth 1 -name '*.md' -type f -print0 2>/dev/null)
+      [[ -n "$keep" ]] && find "$dir" -maxdepth 1 -name '*.md' -type f ! -path "$keep" -delete 2>/dev/null || true
     fi
 
     # 3. マーカー

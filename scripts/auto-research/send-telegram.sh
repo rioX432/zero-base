@@ -42,6 +42,26 @@ API="https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN:-DRYRUN}/sendMessage"
 
 # 4096文字ごとに分割（マルチバイトを避けて安全側に 3500 文字で切る）
 LIMIT=3500
+
+# 1回の sendMessage POST。$2 が空なら parse_mode を付けない（plain text）
+tg_post() {
+  local text="$1" mode="${2:-}" http
+  local args=(
+    --data-urlencode "chat_id=${TELEGRAM_CHAT_ID}"
+    --data-urlencode "text=${text}"
+    --data-urlencode "disable_web_page_preview=true"
+  )
+  [[ -n "$mode" ]] && args+=(--data-urlencode "parse_mode=${mode}")
+  http=$(curl -sS -o "/tmp/tg_resp.$$" -w '%{http_code}' "${args[@]}" "$API") \
+    || { echo "error: curl 失敗" >&2; return 1; }
+  if [[ "$http" != "200" ]]; then
+    echo "error: Telegram API HTTP $http: $(cat "/tmp/tg_resp.$$" 2>/dev/null)" >&2
+    rm -f "/tmp/tg_resp.$$"
+    return 1
+  fi
+  rm -f "/tmp/tg_resp.$$"
+}
+
 send_chunk() {
   local text="$1"
   if [[ "$DRY_RUN" == "1" ]]; then
@@ -50,24 +70,23 @@ send_chunk() {
     echo "----- (${#text} chars) -----"
     return 0
   fi
-  local http
-  http=$(curl -sS -o /tmp/tg_resp.$$ -w '%{http_code}' \
-    --data-urlencode "chat_id=${TELEGRAM_CHAT_ID}" \
-    --data-urlencode "text=${text}" \
-    --data-urlencode "parse_mode=Markdown" \
-    --data-urlencode "disable_web_page_preview=true" \
-    "$API") || { echo "error: curl 失敗" >&2; return 1; }
-  if [[ "$http" != "200" ]]; then
-    echo "error: Telegram API HTTP $http: $(cat /tmp/tg_resp.$$ 2>/dev/null)" >&2
-    rm -f /tmp/tg_resp.$$
-    return 1
+  # LLM出力のMarkdownは未閉じ */_ 等でlegacy parserが400を返しやすい
+  # → Markdownで失敗したらplain textで再送（配信自体は落とさない）
+  if ! tg_post "$text" "Markdown"; then
+    echo "warn: Markdown送信に失敗 → plain text で再送" >&2
+    tg_post "$text" ""
   fi
-  rm -f /tmp/tg_resp.$$
 }
 
 # 行境界を尊重しつつ LIMIT で分割
 buf=""
 while IFS= read -r line || [[ -n "$line" ]]; do
+  # 1行が LIMIT を超える場合は行内でハード分割（行単位の分割では 4096 制限を超える）
+  while (( ${#line} > LIMIT )); do
+    [[ -n "$buf" ]] && { send_chunk "$buf"; buf=""; }
+    send_chunk "${line:0:LIMIT}"
+    line="${line:LIMIT}"
+  done
   if (( ${#buf} + ${#line} + 1 > LIMIT )); then
     [[ -n "$buf" ]] && send_chunk "$buf"
     buf="$line"

@@ -81,13 +81,13 @@ DRY_RUN=1 ./scripts/auto-research/run-local.sh   # 送信せず内容確認
 ### 5.3 cron 登録（毎朝7時JSTの例）
 `crontab -e` で追記:
 ```cron
-# 毎日 07:00 JST に自律リサーチ1本
-0 7 * * *  cd /path/to/zero-base && /usr/local/bin/bash scripts/auto-research/run-local.sh >> /tmp/auto-research.log 2>&1
+# 毎日 07:00 JST に自律リサーチ1本（スクリプトは bash 3.2 互換＝macOS標準 /bin/bash で可）
+0 7 * * *  cd /path/to/zero-base && /bin/bash scripts/auto-research/run-local.sh >> /tmp/auto-research.log 2>&1
 ```
 
 ### 仕組み（run-local.sh）
-`pick-topic`(機械選定) → `claude -p`(Understand・検証付き・**権限プロンプトなし** `--permission-mode dontAsk --allowedTools WebSearch,WebFetch`) → 整形 → `send-telegram` → INDEX追記。
-Claude には**Web取得と読取専用**しか渡さない（送信・書込はシェルが担当＝最小権限）。
+`pick-topic`(機械選定) → `claude -p` 単発セッションで **Understand 相当の検証付きリサーチ**（2ソース裏取り・残存不確実性併記。フル /think パイプライン=subagent/judge は無人実行では走らせない・**権限プロンプトなし** `--permission-mode dontAsk --allowedTools WebSearch,WebFetch,Read,Grep,Glob`） → 整形 → `send-telegram` → INDEX追記。
+Claude には**Web取得と読取専用**しか渡さない（送信・書込はシェルが担当＝最小権限）。Telegram送信は Markdown で失敗したら plain text で自動再送（配信は落とさない）。
 
 > 認証: `.env` に `CLAUDE_CODE_OAUTH_TOKEN`（サブスク）か `ANTHROPIC_API_KEY`（API課金）。前者が月額内で安い。
 > 参考: [Claude Code headless](https://code.claude.com/docs/en/headless) / [authentication](https://code.claude.com/docs/en/authentication)

@@ -2,8 +2,10 @@
 #
 # run-local.sh — 自律リサーチ v1 をローカルマシンで実行する（cron から呼ぶ）
 #
-# 構成: pick-topic(機械選定) → Claude Code CLI で /think(Understand,検証付き) → 整形
-#       → send-telegram → INDEX追記。token等は scripts/auto-research/.env のみ。
+# 構成: pick-topic(機械選定) → Claude Code CLI 単発セッションで Understand 相当の
+#       検証付きリサーチ（2ソース裏取り・残存不確実性併記。フル /think パイプライン
+#       =subagent/judge は無人実行では走らせない） → 整形 → send-telegram → INDEX追記。
+#       token等は scripts/auto-research/.env のみ。
 #
 # 前提:
 #   - Claude Code CLI (`claude`) がインストール＆認証済み（`claude login` or ANTHROPIC_API_KEY）
@@ -25,10 +27,11 @@ fi
 DRY_RUN="${DRY_RUN:-0}"
 CLAUDE_BIN="${CLAUDE_BIN:-claude}"
 # 無人cron用フラグ（cited: code.claude.com/docs/en/headless）。
-# リサーチ手順はWeb取得＋読取専用(Read/Grep/GlobはdontAskで自動許可)だけで足りる。
+# リサーチ手順はWeb取得＋読取専用で足りる。recall（INDEX grep / profile読み）が
+# dontAsk下で拒否されないよう Read/Grep/Glob も明示allowする。
 # 書込・送信・INDEX追記はこのシェルが担うので、Claudeにはツールを最小限しか渡さない。
 # 環境変数 CLAUDE_ARGS で上書き可。
-CLAUDE_ARGS="${CLAUDE_ARGS:---permission-mode dontAsk --allowedTools WebSearch,WebFetch}"
+CLAUDE_ARGS="${CLAUDE_ARGS:---permission-mode dontAsk --allowedTools WebSearch,WebFetch,Read,Grep,Glob}"
 CLAUDE_MODEL="${CLAUDE_MODEL:-}"   # 未指定ならCLI既定モデル（IDをハードコードしない）
 
 log() { printf '[auto-research] %s\n' "$*" >&2; }

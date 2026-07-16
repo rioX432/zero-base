@@ -64,7 +64,9 @@ recent_index_lc() {
     | tr 'A-Z' 'a-z'
 }
 
-mapfile -t TOPICS < <(parse_topics)
+# mapfile は bash 4+ のみ（macOS 標準 bash 3.2 に無い）ので while-read で読む
+TOPICS=()
+while IFS= read -r row; do TOPICS+=("$row"); done < <(parse_topics)
 if [[ ${#TOPICS[@]} -eq 0 ]]; then
   echo "error: interests.yaml の topics: を解析できませんでした（$INTERESTS_YAML）" >&2
   exit 1
