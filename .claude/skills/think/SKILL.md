@@ -7,7 +7,7 @@ when_to_use: |
   creating dev-ready GitHub issues from research findings
 argument-hint: "[テーマ・依頼内容（リポジトリURLを含む場合はリポジトリ分析モードで実行）]"
 disable-model-invocation: true
-allowed-tools: Read, Write, Glob, Grep, Agent, WebSearch, WebFetch, AskUserQuestion, mcp__claude_ai_Notion__notion-fetch, mcp__claude_ai_Notion__notion-search, mcp__gemini-deepsearch__deep_search, mcp__perplexity-web__perplexity_search, mcp__perplexity-web__perplexity_ask, mcp__social-superpowers__*, mcp__grok__*, mcp__codex__codex, mcp__codex__codex-reply, mcp__claude-in-chrome__*, mcp__github__create_issue, mcp__github__add_issue_comment, mcp__github__list_issues
+allowed-tools: Read, Write, Glob, Grep, Agent, WebSearch, WebFetch, AskUserQuestion, mcp__notion__notion-fetch, mcp__notion__notion-search, mcp__gemini-deepsearch__deep_search, mcp__perplexity-web__perplexity_search, mcp__perplexity-web__perplexity_ask, mcp__social-superpowers__*, mcp__grok__*, mcp__codex__codex, mcp__codex__codex-reply, mcp__claude-in-chrome__*, mcp__github__create_issue, mcp__github__add_issue_comment, mcp__github__list_issues
 effort: max
 ---
 
@@ -25,12 +25,30 @@ effort: max
 
 ## モード判定
 
-### 入力モード（What）
-`$ARGUMENTS` にGitHubリポジトリURL（`github.com/...`）が含まれる場合:
-→ **リポジトリ分析モード**（Phase 0 + Phase 4をGap Analysisに変更）
+### 入力モード（What）— 「対象」と「問いの種類」を別々に決める
 
-含まれない場合:
-→ **通常モード**（Phase 0をスキップ）
+**(a) 対象**: `$ARGUMENTS` にGitHubリポジトリURL（`github.com/...`）が含まれる → **リポジトリ分析モード**（Phase 0 + Phase 4をGap Analysisに変更）。含まれなければ Phase 0 をスキップ。
+
+**(b) 問いの種類（profile）**: 対象とは**独立に**、問いの性質で profile を選ぶ。収集ソース・検証の作法・発散量・評価軸が変わる。
+
+| profile | 該当する問い | 実測比率(164テーマ) | 状態 |
+|---|---|---|---|
+| `tech-selection` | 技術・アーキテクチャの選定/検証 | 47% | 未実装（既定で動く） |
+| `ideation` | 事業・プロダクト戦略、成長アイディア | 22% | 未実装（既定で動く） |
+| **`self-audit`** | **自分のリポジトリ・設定・ハーネスを実査して直す** | **21%** | **実装済** |
+| `advocacy` | 登壇・発信（CFP/スライド/記事） | 6% | 未実装（既定で動く） |
+| `casual` | 軽い事実確認・実務判断 | 4% | 未実装（既定で動く） |
+
+**★ `self-audit` の取りこぼしに注意**: このカテゴリは **GitHub URL を伴わないことが多く**、放置すると (a) の判定で通常モードに入り、**一次ソースが自分のコードなのに外部Web収集パイプラインに流れる**。**一次ソースが自リポである問いは、URLの有無にかかわらず `self-audit` を選ぶ。**
+
+**手順:**
+1. **Phase 1.1 で profile を判定する。迷ったら既定値に倒さず rio に問う**（分類精度は未検証のため）。
+2. **Phase 1.2 の承認表に profile を明記し、rio の承認と同時に凍結する**（成果物ができてから自分に有利なルーブリックを選ぶ *rubric shopping* の防止）。
+3. 承認後、`${CLAUDE_SKILL_DIR}/references/profiles/_shared.md` と `${CLAUDE_SKILL_DIR}/references/profiles/{profile}.md` を **明示的に Read する**（参照先は列挙しただけでは読み込まれない）。
+4. **run contract を記録**: `profile_id / rubric_id / output_mode / 既定値から外した項目と理由`。
+   **同一セッションで2回目の /think を回すときは再判定・再記録する**（前回の profile が context に残って引き継がれるため）。
+
+未実装の profile は `_shared.md` の既定値で従来どおり動く（挙動は変わらない）。
 
 ### 成果物モード（Where to stop）★終点を冒頭で固定する
 
@@ -71,6 +89,8 @@ Phase 5: Proposal
 ```
 
 全Phase共通: 「検証済み」には必ず**残存不確実性**を併記する（過信防止）。
+
+> **allowed-tools の効き方（公式仕様・誤解しやすい）**: frontmatter の `allowed-tools` は「このスキルを起動した**ターンの間だけ**、許可を求めずに使えるツール」であり、**次のメッセージを送ると失効する**。/think は承認ゲートが4つあり必ず複数ターンにまたがるため、**2ターン目以降はこの事前承認が効かない**。恒久的に許可プロンプトを避けたいツールは `.claude/settings.local.json` 側に置くこと。`Bash` はここに含めていない（無条件許可のリスクを避けるため。実行自体は都度承認で可能）。
 
 ## 報告ルール（★全Phase共通）
 
@@ -316,9 +336,12 @@ Phase 4 の分析中に**重大な情報ギャップ**が発見された場合�
 1. **2案生成**（通常）/ **2パターンのロードマップ**（リポジトリ分析）
 2. `counter-argument` agent で反論検証（自己採点で的外れな反論を除外したもの）
 3. **生き残った反論を提案に反映して改訂**（Generator-Criticループ）。提案比較表を作成
-4. **judge 品質ゲート**: `judge` agent でルーブリック採点（`references/verification.md` P4）。
-   - 順序入替2回採点・棄権許容。
-   - **停止条件（人間トリガー）**: 総合<0.7が2回連続 → rioに確認を上げる。ループバック上限2回。**最終検証者は人間**。
+4. **judge 品質ゲート**: `judge` agent で採点（`references/verification.md` P4）。**judge は評価器であって判定者ではない。**
+   - **層1（証拠ゲート）は常に走る**。層2は Phase 1.2 で凍結した `rubric_id` を**呼び出し時に渡した場合のみ**走る（渡さなければ層1のみ）。
+   - **judge に閾値を渡さない**（プロンプトにも参照文書にも数値を書かない）。judge はスコアと観察のみを返す。
+   - **合否判定はこちら（メインagent）が行う**: 総合<0.7が2回連続 → rioに確認を上げる。ループバック上限2回。**最終検証者は人間**。
+   - **`veto: true` が返ったら、スコアの高低にかかわらず即修正**（捏造引用・NOT_ALIGNED・単一ソース主柱の未明示）。平均で相殺しない。
+   - **初回スコアと改訂後スコアを分けて記録する**（張り付きが anchoring 由来か revise-until-pass 由来かを後から切り分けるため）。
 5. `workspace/{テーマ名}/proposal.md` に保存。**「検証済み」「推奨」には残存不確実性を併記**。
 6. **INDEX.md追記（レイヤーA）**: `workspace/INDEX.md` に1行追記（テーマ/当時の暫定結論(要再検証)/検証済ソースURL/失敗クエリ/既知の罠）。**結論はrecall対象にしない規律を守る**。
 7. **profile.md 更新（レイヤーB）**: そのセッションで **新たに判明した rio の安定属性**（判断の好み・恒常的制約・地雷）があれば `knowledge/profile.md` を更新する。**マージ & 重複排除**（append-onlyにしない）・**推測で書かない**・**2回以上観測した傾向のみ記録**（1発言で人格を決めない）。追記でよいのは「更新ログ」節のみ。詳細: `references/knowledge.md`。新属性が無ければ何もしない。
@@ -329,138 +352,18 @@ Phase 4 の分析中に**重大な情報ギャップ**が発見された場合�
 
 ---
 
-## Phase D: 詳細設計（Codex必須連携）
+## Phase D / Phase I（設計・Issue化）
 
-**リサーチ結果をもとに技術設計を行う場合に実行。**
-コードの設計・詳細設計（シーケンス、アーキテクチャ、テックスタック選定等）は**必ずCodexと共同で実施**する。
+**Design / Ship モードのときのみ**、`${CLAUDE_SKILL_DIR}/references/phase-design-ship.md` を読んで実行する。
+要点だけ再掲: **Phase D は Codex との共同必須**（`mcp__codex__codex` で独立検証 → クロスバリデーション表 → design.md）。**Phase I は Phase D 完了が前提**。
 
-テンプレートは `references/design-templates.md` を参照。
+## Anti-Patterns と品質チェック
 
-### D.1 Claude起案
-
-リサーチ結果から設計案を策定:
-- アーキテクチャ案をMermaid図で可視化（システム構成図 / シーケンス図 / コンポーネント図）
-- 技術選定の根拠をリサーチ結果にリンク
-- 設計判断ログ（何を・なぜ・どの選択肢から選んだか）
-
-### D.2 Codex検証（必須）
-
-`mcp__codex__codex` で設計案をCodexに送付し、独立検証を受ける:
-
-```
-mcp__codex__codex(
-  prompt="以下の設計案を検証してください。ベストプラクティス・設計パターンの観点から問題点、代替案、リスクを指摘してください。\n\n{設計案}",
-  developer-instructions="You are a senior architect reviewing a technical design. Focus on: (1) design pattern correctness, (2) scalability concerns, (3) tech stack fitness, (4) implementation feasibility. If a target repository is provided, read the actual codebase to validate assumptions.",
-  cwd="{対象リポジトリのパス（あれば）}",
-  sandbox="read-only"
-)
-```
-
-Codexの指摘に対して `mcp__codex__codex-reply` で対話しながら設計を詰める。
-
-### D.3 クロスバリデーション
-
-| 判断ポイント | Claude案 | Codex案 | 最終決定 | 根拠 |
-|-------------|---------|---------|---------|------|
-
-差分がある箇所は根拠を突き合わせて解決。
-
-### D.4 保存と報告
-
-- `workspace/{テーマ名}/design.md` に保存（Mermaid図・設計判断ログ含む）
-- **チャットで設計の全体像、主要な判断とその理由を説明** — Mermaid図・D.3クロスバリデーション表・判断ログを**チャット本文に載せる**。「design.md 参照」への丸投げ禁止
-
-Issue作成が必要な場合 → Phase I へ。
-
----
-
-## Phase I: Dev Ready Issue作成
-
-**Phase D（詳細設計）が完了していることが前提。**
-
-テンプレートは `references/design-templates.md` の「Dev Ready Issue」を参照。
-
-### I.1 Issue分割
-
-設計を実装可能な単位に分割。各Issueが独立して着手可能なサイズにする。
-
-### I.2 Issue本文の作成
-
-各Issueに以下を含める:
-- **背景・目的**: リサーチ結果への参照
-- **設計概要**: Mermaid図（アーキテクチャ・シーケンス）
-- **技術スタック・依存関係**
-- **実装方針**: ファイル単位の変更内容
-- **受け入れ基準（Acceptance Criteria）**: チェックリスト形式
-- **テスト方針**
-- **参考リンク**: リサーチソース・設計ドキュメント
-- **見積もり**: 工数・複雑度
-
-### I.3 Issue作成
-
-`mcp__github__create_issue` でIssueを作成。
-
-### I.4 報告
-
-**チャットでIssue一覧と各Issueの概要を説明。**
-
----
-
-## Anti-Patterns（明示的に禁止する行為）
-
-- **URLを発明しない**: 存在を確認できないURLを引用に使わない。source-verifierで検証する
-- **counter-argumentをスキップしない**: 時間がなくても必ず実行する
-- **ユーザー提供データで自己主張を循環検証しない**: 外部ソースで裏取りする
-- **「0件」を安易に結論しない**: 複数手法でクロスチェックしてから結論する
-- **前提を検証せず受け入れない**: Phase 1.1aで選択したフレームワークで前提を問い直す
-- **情報ギャップを無視してPhase 5に進まない**: Phase 4.3のループバックを実行する
-- **検証対象を「重要だから」でLLMに選ばせない**: ルールベースで機械抽出する（`references/verification.md` P1）
-- **同一モデルのN回多数決を「検証」と呼ばない**: 系統的バイアスが消えない。cross-modelで独立性を作る
-- **過去の結論をrecallして確定事実扱いしない**: anchoring毒。ソースと失敗クエリのみ再利用（レイヤーA）
-- **profile（レイヤーB）でテーマの結論を歪めない**: `knowledge/profile.md` は「提案の当てはめ・提示形式」専用。「rioが好きだから結論もそれ」にしない。テーマの真偽はゼロベースで再導出する
-- **profile を append-only の澱にしない**: 更新はマージ&重複排除。推測で人格を刻まない（2回以上観測した傾向のみ）。rio が直接編集できる前提を壊さない
-- **workspace を昇華前に剪定しない / 昇華済みを放置して肥大させない**: INDEX追記（昇華）を済ませてから raw をアーカイブ。`scripts/compact-workspace.sh`（既定dry-run）で定期コンパクション。アーカイブ（`_archive/`）と最終成果物は消さない
-- **「検証済み」を残存不確実性なしで書かない**: 過信を生む
-- **提案の根拠を単一ソースで主柱にしない**: 最低2本の独立裏取り。取れなければ「裏取り不足」と明示（実測: 単一ソース率93%）
-- **主張の細部をソース範囲を超えて書かない**: 数値・固有名詞・最上級はソースに個別明記を確認（実測: PARTIAL過剰主張33%）
-- **宣言した成果物モードの終点を越えて勝手に進まない**: Understandなのに提案・設計・Issueを作らない。昇格はrio承認で（`feedback_scope_per_request`）
-- **調査計画の承認（Phase 1.2）を飛ばして収集を走らせない**: 軽い事実確認1件を除き、着手前に軸/ソース/モードを提示する
-- **いきなり提案を出さない**: Phase 5.0 の調査レポート（背景→調査結果→考察=推論トレース→まとめ）をチャット提示し、**rio の承認を得てから**提案本体を生成する。レポートと提案を同一ターンで一気に出さない
-- **発散案（Phase 4.5）を judge/counter-argument で殺さない**: 収束ゲートは提案本体にのみ適用。発散は「要rio判断」で残す
-- **発散を思いつきでやらない**: 廃棄プール（収集したが未使用の情報）と根拠ベースの視点選出から出す
-- **実装難度を理由にリサーチ〜提案の選択肢を削らない**: コスト基準線は「rio+AIで日〜週」（build-vs-buy反転）。既存に無ければ「作る」を既定にする（Phase 1.0 Ambition pass）
-- **アイディア出し・リサーチ・提案に ownership/保守/運用コストを持ち込まない**: 「どう作るか・保守負担・build≠own」は **Phase D（設計）で人間（rio）が舵取り**する領域。リサーチ段階で工数の心配をして案を萎ませない
-- **ヘッドレスブラウザを自動起動しない**: WebFetch/検索API を既定にし、ログイン壁のみ Claude in Chrome（メインagent）。Playwright も ChatGPT web MCP も使わない（OpenAI系は Codex `web_search=live` でブラウザレス）
-- **壊れた/退化した収集結果から synthesis しない**: `deep_search` 等の返り値が空・退化（英数字比率が極端に低い等の破損）していないかを使う前に検査する。破損時は1回リトライ or 別ソース（WebSearch/Codex）へフォールバック。ゴミを黙って結論に流し込まない（実測: Gemini `answer` が英数字81/65,615文字で破損した事例あり）
-
-## 品質チェック（最終確認）
-
-- [ ] 成果物モード（Understand/Decide/Design/Ship）を冒頭で宣言し、終点を越えずに進めたか
-- [ ] Phase 1.2 の調査計画承認をrioから得たか（軽い1件を除く）
-- [ ] Phase 1.0 Ambition pass で理想解を先に描き、実装難度で選択肢を削っていないか（ownership/保守を持ち込んでいないか）
-- [ ] （Decide以上）Phase 4.5 発散レーンを実行し、provenance付きで「面白い脇道」を提示したか
-- [ ] （Decide以上）Phase 4.5 で Build-the-gap（既存に無い→作る案）を一級の選択肢として提示したか
-- [ ] Phase 5.0 調査レポート（背景/調査結果/考察=推論トレース/まとめ）をチャット提示し、rio の承認を得てから提案を生成したか
-- [ ] ブラウザ取得を階層化したか（WebFetch既定→Claude in Chromeはメインagent限定→Playwright不使用）
-- [ ] 全事実主張にURL付きソースがあるか
-- [ ] source-verifier で claim検証済みか（ルールベース抽出→CoVe→cross-model）
-- [ ] grounded hallucination（NOT_ALIGNED）/ cross-model不一致を洗い出したか
-- [ ] **提案の根拠主張は2本以上の独立裏取りがあるか**（単一ソースは「裏取り不足」と明示）
-- [ ] **主張の細部（数値/固有名詞/最上級）がソース範囲を超えていないか**（scope check）
-- [ ] 「検証済み」に残存不確実性を併記したか
-- [ ] Synthesisを cross-model で合意形成したか（1サンプル確定でないか）
-- [ ] judge 品質ゲートを通過したか（<0.7×2回なら人間確認）
-- [ ] INDEX.md に追記したか（結論はrecall対象にしない規律を守ったか｜レイヤーA）
-- [ ] 新たに判明した rio の安定属性があれば `knowledge/profile.md` をマージ更新したか（推測で書かず・重複排除｜レイヤーB）
-- [ ] 推測と事実が区別されているか
-- [ ] counter-argument の反論検証を通過しているか
-- [ ] 未取得データに理由が明記されているか
-- [ ] Phase 1.1aで選択した思考フレームワークをPhase 4で適用したか
-- [ ] Phase 2のGap識別で挙げた不足情報がPhase 3で解消されたか
-- [ ] ユーザーとの調査結果確認（Phase 3.5）を実施したか
-- [ ] **各Phaseでチャットによる説明を行ったか**
-- [ ] （Phase D実施時）Codexによる設計検証を実施したか
-- [ ] （Phase I実施時）IssueがDev Ready状態か（着手に必要な情報が全て記載されているか）
+禁止事項の一覧と最終チェックリストは `${CLAUDE_SKILL_DIR}/references/quality-gates.md` にある。
+**成果物を出す直前に必ず読む。** 特に頻出の3つだけここに置く:
+- **いきなり提案を出さない**（5.0 の承認ゲートを飛ばさない）
+- **実装難度・工数を理由にリサーチ〜提案の選択肢を削らない**（原則8）
+- **「検証済み」を残存不確実性なしで書かない**
 
 ## 出力の原則
 

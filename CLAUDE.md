@@ -25,53 +25,26 @@
 
 ### 通常モード
 
+★冒頭で**成果物モードを宣言**（Understand/Decide/Design/Ship）＝終点を固定し、越えて進まない。
+
 ```
-/think テーマ
-  │
-  ★成果物モードを冒頭で宣言（Understand/Decide/Design/Ship）＝終点を固定。越えて進まない
-  │
-  Phase 0.5: Recall（レイヤーA: workspace/INDEX.md を grep ＋ レイヤーB: knowledge/profile.md を読む）
-  │  └─ ★A=結論はrecallしない（ソースURL+失敗クエリのみ）／ B=rio嗜好・文脈はrecall可（当てはめ・提示用。真偽は歪めない）
-  │
-  Phase 1: Scoping（分解・FW選択・モード仮決め）
-  │  ├─ Phase 1.0: ★Ambition pass（理想解を先に描く｜コスト観AI再基準化。工数で選択肢を削らない・無ければ作る既定・ownership/保守はPhaseDへ）
-  │  └─ Phase 1.2: ★調査計画の提示と承認（軸/ソース/FW/モード/effort）
-  │       └─ rio承認後に収集を走らせる（Gemini collaborative planning 型）
-  │  ├─ Deep Search（Gemini + Codex(web_search=live) + perplexity-web、全てブラウザレス）※Understandは絞る（effort scaling）
-  │  ├─ SNSリアルタイム（social-superpowers）
-  │  └─ Grok X Search（APIキー設定時）
-  │
-  Phase 2: Research + claim検証
-  │  ├─ ブラウザ取得は階層化: WebFetch/検索API 既定 → ログイン壁のみ Claude in Chrome（メインagent）→ Playwright不使用
-  │  ├─ クロスバリデーション + deep-researcher で補完
-  │  └─ source-verifier: ルールベース抽出→CoVe方式→cross-model独立検証
-  │       （grounded hallucination/論争を検出、残存不確実性を併記）
-  │
-  Phase 3: Deep Dive（case-analyzer × N 並列 / social-scanner）
-  │
-  Phase 3.5: ★ ユーザーとの調査結果確認
-  │
-  Phase 4: Synthesis（本質の特定）← メインAgent
-  │  └─ cross-model 合意（一致=本質 / 相違=不確実と明記。同一モデルN回はしない）
-  │
-  Phase 4.5: 発散レーン（Divergence｜方針外OKの面白い脇道 + Build-the-gap）
-  │  ├─ 廃棄プール（未使用情報）+ STORM型 視点選出で根拠ベースに生成
-  │  ├─ ★Build-the-gap: 「既存に無い→作る」案を一級の選択肢として必ず1件立てる（AI速度前提）
-  │  └─ judge非適用・provenance付き・★要rio判断（Goしたものだけ深掘り）
-  │
-  Phase 5: Proposal
-  │  ├─ 5.0: ★調査レポート（背景→調査結果→考察=推論トレース→まとめ）をチャット提示
-  │  │    └─ ★rio承認ゲート: 提案に進むか判断を仰ぐ（承認まで提案本体を生成しない）
-  │  ├─ 5.1: counter-argument（自己採点で的外れ除外）→ 反論を反映し改訂
-  │  ├─ judge: ルーブリック採点（順序入替2回・棄権許容）
-  │  │    └─ <0.7×2回 → ★rio確認（人間が最終検証者・ループ上限2回）
-  │  └─ INDEX.md 追記（レイヤーA・結論はrecall対象外）＋ profile.md マージ更新（レイヤーB・新属性があれば）
-  │
-  ├─ ［Understand］終了（本質+推論トレースまで。提案なし）
-  ├─ ［Decide］終了（提案まで）
-  └─ → Phase D: 詳細設計（Codex必須連携）［Design］
-        └─ → Phase I: Dev Ready Issue作成［Ship］
+0.5 Recall → 1 Scoping（1.0 Ambition pass ／ ★1.2 調査計画の承認）→ 1.3 並列収集
+ → 2 Research+claim検証 → 3 Deep Dive → ★3.5 調査結果確認 → 4 Synthesis（cross-model合意）
+ → 4.5 発散レーン（★要rio判断・judge非適用）→ ★5.0 調査レポート+承認ゲート → 5.1 提案+反論検証+judge
+ → ［Understand］終了 ／［Decide］終了 ／→ D 詳細設計［Design］→ I Issue作成［Ship］
 ```
+
+**各Phaseの手順は `.claude/skills/think/SKILL.md` が唯一の正**。CLAUDE.md には原則のみ置く（二重管理を避ける）。原則の要点:
+
+- **0.5 Recall**: A=結論はrecallしない（検証済ソースURL+失敗クエリのみ）／B=`knowledge/profile.md` はrecall可（当てはめ・提示用。真偽は歪めない）。**INDEXは索引であり、過去テーマは `grep -ril <kw> workspace/*/*.md` でも直接引く**
+- **1.0 Ambition pass**: 工数で選択肢を削らない。無ければ作るを既定。ownership/保守は Phase D へ
+- **1.1 profile 判定**: 問いの種類（`tech-selection` / `ideation` / **`self-audit`** / `advocacy` / `casual`）を選ぶ。**一次ソースが自リポである問いは、GitHub URLが無くても `self-audit`**（放置すると外部Web収集に流れる）。迷ったらrioに問う
+- **★1.2**: 軸/ソース/FW/**profile**/モード/effort を提示し、rio承認後に収集を走らせる（承認と同時にprofileとrubricを**凍結**）
+- **2**: ブラウザ取得は階層化（WebFetch/検索API既定 → ログイン壁のみClaude in Chrome＝メインagent限定 → Playwright不使用）。source-verifierはルールベース抽出→CoVe→cross-model
+- **4**: cross-model 合意（一致=本質／相違=不確実と明記。同一モデルN回はしない）
+- **4.5**: 廃棄プール＋STORM型視点で根拠ベースに生成。**Build-the-gap を必ず1件**。provenance付き
+- **★5.0**: 調査レポート（背景→調査結果→考察=推論トレース→まとめ）を提示し、**承認を得るまで提案本体を書かない**
+- **5.1**: counter-argument → 改訂 → judge → INDEX追記／profile.mdマージ更新
 
 ### リポジトリ分析モード
 
