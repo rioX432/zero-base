@@ -10,11 +10,11 @@ SKILL.md / CLAUDE.md 側の固定値は、以下のパラメータ名に置き�
 | `primary_source` | web | 一次ソースとして何を信頼するか | SKILL.md 情報収集ソース |
 | `collection_shape` | parallel-deep-search | 収集の形 | SKILL.md 1.3 |
 | `min_sources` | 2 | 提案の主柱に必要な独立裏取り本数 | CLAUDE.md 品質基準 |
-| `verification_mode` | cross-model | 検証の作法 | verification.md P2 |
+| `verification_mode` | primary-direct-then-cross-model | 検証の作法（★2026-08-23改訂: 以前`cross-model`単体だったが、一次ソース直接確認を先に置きcross-modelを補助に格下げ） | verification.md P2 |
 | `divergence_count` | 3 | Phase 4.5 発散レーンの案数（0で無効） | SKILL.md 4.5.2 |
 | `proposal_count` | 2 | Phase 5.1 の提案数 | SKILL.md 5.1 |
 | `rubric_id` | null | judge層2に注入する成果ルーブリック（nullなら層1のみ） | judge.md |
-| `default_endpoint` | Decide | 既定の成果物モード | SKILL.md 成果物モード |
+| `default_endpoint` | Understand | 既定の成果物モード（★2026-08-23修正: SKILL.mdの「迷ったらUnderstand」と整合させた。以前はDecideで矛盾していた） | SKILL.md 成果物モード |
 | `effort_basis` | complexity | エージェント数/ツールコール数の決定基準 | — |
 
 ## effort の決め方（★カテゴリで決めない）

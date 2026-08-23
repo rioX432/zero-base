@@ -2,6 +2,14 @@
 
 Phase 1.1a でテーマの性質に応じて1-2個を選択し、Phase 4 で適用する。
 
+## Contents
+- First Principles（第一原理思考）
+- Inversion（逆転思考）
+- Second-Order Effects（二次効果思考）
+- Hypothesis-Driven（仮説駆動思考）
+- Systems Thinking（システム思考）
+- Pre-mortem（事前検死）
+
 ---
 
 ## First Principles（第一原理思考）
